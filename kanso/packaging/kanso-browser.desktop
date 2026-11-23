@@ -1,0 +1,26 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Kanso
+GenericName=Web Browser
+GenericName[ru]=Веб-браузер
+Comment=Browse the Web with the current Omarchy theme
+Comment[ru]=Браузер с оформлением текущей темы Omarchy
+Exec=kanso-browser %u
+Icon=kanso-browser
+Terminal=false
+StartupNotify=true
+StartupWMClass=kanso-browser
+Categories=Network;WebBrowser;
+MimeType=text/html;text/xml;application/xhtml+xml;application/pdf;x-scheme-handler/http;x-scheme-handler/https;
+Actions=new-window;new-private-window;
+
+[Desktop Action new-window]
+Name=New Window
+Name[ru]=Новое окно
+Exec=kanso-browser --new-window
+
+[Desktop Action new-private-window]
+Name=New Private Window
+Name[ru]=Новое приватное окно
+Exec=kanso-browser --private-window

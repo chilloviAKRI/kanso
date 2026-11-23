@@ -216,7 +216,22 @@ export let ContentSearch = {
       "searchString",
       "healthReportKey",
     ]);
-    let engine = lazy.SearchService.getEngineByName(data.engineName);
+    // Kanso's built-in New Tab always uses the default at submit time.
+    // Other ContentSearch clients continue to pass the engine they selected.
+    let engine;
+    if (
+      data.engineName === null &&
+      actor.manager.documentURI?.spec === "about:newtab"
+    ) {
+      engine = actor.browsingContext.usePrivateBrowsing
+        ? lazy.SearchService.defaultPrivateEngine
+        : lazy.SearchService.defaultEngine;
+    } else {
+      engine = lazy.SearchService.getEngineByName(data.engineName);
+    }
+    if (!engine) {
+      return;
+    }
     let submission = engine.getSubmission(data.searchString, "");
     let win = browser.documentGlobal;
     if (!win) {

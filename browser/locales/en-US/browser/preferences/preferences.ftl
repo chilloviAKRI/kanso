@@ -373,6 +373,13 @@ appearance-group2 =
   .label = Website appearance
   .description = Some websites change their colors to match your preferences. Choose your color scheme.
 
+kanso-appearance-heading = Omarchy
+kanso-appearance-follow =
+    .label = Follow the Omarchy theme
+    .accesskey = O
+    .description = Use Omarchy’s appearance in Kanso. Turn this off to use your selected Firefox theme.
+kanso-appearance-description = Kanso follows the current Omarchy palette, font, wallpaper, and Hyprland corner radius.
+
 preferences-web-appearance-choice-auto3 =
   .label = System
   .title = Automatically change website backgrounds and content based on your system settings and { -brand-short-name } theme.

@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src resource:; style-src resource:; form-action 'none'; base-uri 'none'">
+    <title>New Tab</title>
+    <link rel="stylesheet" href="resource://kanso/newtab.css">
+    <script defer src="resource://kanso/newtab.js"></script>
+  </head>
+  <body>
+    <canvas id="waves" aria-hidden="true"></canvas>
+    <main>
+      <form id="search" role="search">
+        <label class="sr-only" id="label" for="query">Search the web</label>
+        <span class="prompt" aria-hidden="true">›</span>
+        <input id="query" name="q" type="search" placeholder="Search the web…" maxlength="4096" required autocomplete="off" spellcheck="false">
+      </form>
+    </main>
+  </body>
+</html>

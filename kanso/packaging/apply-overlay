@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+set -euo pipefail
+root=$1
+assets=$2
+
+install -d "$root/browser/components/kanso"
+for source in "$assets"/{moz.build,jar.mn,chrome.css,kanso.svg,newtab.html,newtab.css,newtab.js,*sys.mjs}; do
+  install -m644 "$source" "$root/browser/components/kanso/"
+done
+
+branding="$root/browser/branding/unofficial"
+for size in 16 22 24 32 48 64 128 256; do
+  rsvg-convert -w "$size" -h "$size" "$assets/kanso.svg" -o "$branding/default$size.png"
+done
+for item in about:128 about-logo:128 about-logo@2x:256 about-logo-private:128 about-logo-private@2x:256; do
+  rsvg-convert -w "${item#*:}" -h "${item#*:}" "$assets/kanso.svg" \
+    -o "$branding/content/${item%:*}.png"
+done
+
+install -m644 "$assets/kanso.svg" "$branding/content/about-logo.svg"
+for wordmark in about-wordmark firefox-wordmark; do
+  cat > "$branding/content/$wordmark.svg" <<'SVG'
+<svg xmlns="http://www.w3.org/2000/svg" width="294" height="85" viewBox="0 0 294 85">
+  <text x="2" y="66" font-family="sans-serif" font-size="78" font-weight="650" fill="#6d9a8c">Kanso</text>
+</svg>
+SVG
+done

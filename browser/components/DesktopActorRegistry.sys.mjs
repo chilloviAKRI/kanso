@@ -675,6 +675,18 @@ let JSWINDOWACTORS = {
     safeForUntrustedWebProcess: true,
   },
 
+  KansoAppearance: {
+    parent: {
+      esModuleURI: "resource:///modules/kanso/KansoAppearanceParent.sys.mjs",
+    },
+    child: {
+      esModuleURI: "resource:///modules/kanso/KansoAppearanceChild.sys.mjs",
+      events: { pageshow: { mozSystemGroup: true } },
+    },
+    matches: ["about:newtab"],
+    remoteTypes: ["privilegedabout"],
+  },
+
   LightweightTheme: {
     child: {
       esModuleURI: "resource:///actors/LightweightThemeChild.sys.mjs",

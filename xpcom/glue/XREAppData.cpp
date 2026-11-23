@@ -52,8 +52,7 @@ void XREAppData::GetDBusAppName(nsACString& aName) const {
   if (env) {
     aName.Assign(env);
   } else {
-    aName.Assign(name);
-    ToLowerCase(aName);
+    aName.Assign(remotingName);
     SanitizeNameForDBus(aName);
   }
 }

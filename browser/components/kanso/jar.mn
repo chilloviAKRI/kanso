@@ -1,0 +1,7 @@
+browser.jar:
+% resource kanso %content/kanso/ contentaccessible=yes
+  content/kanso/chrome.css                 (chrome.css)
+  content/kanso/kanso.svg                  (kanso.svg)
+  content/kanso/newtab.css                 (newtab.css)
+  content/kanso/newtab.html                (newtab.html)
+  content/kanso/newtab.js                  (newtab.js)

@@ -1,18 +1,13 @@
-![Firefox Browser](./docs/readme/readme-banner.svg)
+# Kanso
 
-[Firefox](https://firefox.com/) is a fast, reliable and private web browser from the non-profit [Mozilla organization](https://mozilla.org/).
+Kanso is a Firefox fork for [Omarchy](https://omarchy.org/) on Arch Linux. It follows the desktop palette, light and dark mode, and Hyprland window styling. It has its own browser profile and a minimal new tab with animated pixel waves colored from the current wallpaper.
 
-### Contributing
+## Install on Omarchy
 
-To learn how to contribute to Firefox read the [Firefox Contributors' Quick Reference document](https://firefox-source-docs.mozilla.org/contributing/contribution_quickref.html).
+Download the x86-64 package from the [Kanso releases](https://github.com/chilloviAKRI/kanso/releases) and install it with `sudo pacman -U ./kanso-browser-160.0.1-6-x86_64.pkg.tar.zst`. Open **Kanso** from the application launcher.
 
-We use [bugzilla.mozilla.org](https://bugzilla.mozilla.org/) as our issue tracker, please file bugs there.
+See the [installation and build guide in Russian](kanso/README.md) for settings, source verification, and manual updates. The [Arch build recipe](kanso/PKGBUILD) builds Kanso from Mozilla's signed source archive and the [Kanso patches](kanso/patches/).
 
-### Resources
+## Source
 
-* [Firefox Source Docs](https://firefox-source-docs.mozilla.org/) is our primary documentation repository
-* Nightly development builds can be downloaded from [Firefox Nightly page](https://www.mozilla.org/firefox/channel/desktop/#nightly)
-
-If you have a question about developing Firefox, and can't find the solution
-on [Firefox Source Docs](https://firefox-source-docs.mozilla.org/), you can try asking your question on Matrix at
-chat.mozilla.org in the [Introduction channel](https://chat.mozilla.org/#/room/#introduction:mozilla.org).
+This branch is based on Mozilla's [Firefox 160.0.1 release](https://github.com/mozilla-firefox/firefox/tree/FIREFOX_160_0_1_RELEASE). The upstream [Firefox README](README.mozilla.md) and [license notices](toolkit/content/license.html) are included. Kanso is an independent project.

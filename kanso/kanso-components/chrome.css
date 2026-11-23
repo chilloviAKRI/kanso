@@ -1,0 +1,102 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+@media (forced-colors: none) {
+  :root[lwtheme] {
+    /* Browser themes can set both inline. Use the same colors as page text. */
+    --lwt-toolbar-field-highlight: Highlight !important;
+    --lwt-toolbar-field-highlight-text: HighlightText !important;
+  }
+}
+
+:root[theme-effective-id="kanso-omarchy@local"] {
+  --tab-border-radius: var(--kanso-radius);
+  --toolbarbutton-border-radius: var(--kanso-radius);
+  --urlbar-border-radius: var(--kanso-radius);
+  --urlbarview-border-radius: var(--kanso-radius);
+  --urlbar-inner-border-radius: var(--kanso-radius);
+  --arrowpanel-border-radius: var(--kanso-radius);
+  --panel-border-radius: var(--kanso-radius);
+  --kanso-rule: color-mix(in srgb, var(--toolbar-text-color) 25%, transparent);
+
+  :is(#navigator-toolbox, #sidebar-box, #mainPopupSet, .tab-label, #urlbar-input, .urlbarView) {
+    font-family: var(--kanso-interface-font, monospace), monospace;
+  }
+
+  #navigator-toolbox {
+    background: var(--toolbar-background-color);
+    border-bottom: 1px solid var(--kanso-rule);
+  }
+
+  #TabsToolbar {
+    background: var(--lwt-accent-color);
+  }
+
+  &[uidensity="compact"] #tabbrowser-tabs[orient="horizontal"] {
+    --tab-min-height: 26px;
+    --tab-margin-block: 3px;
+  }
+
+  #tabbrowser-tabs[orient="horizontal"] {
+    /* Keep the dragged tabs and the extended hit area in the same coordinate space. */
+    position: relative;
+
+    :is(.tabbrowser-tab, tab-split-view-wrapper)[dragtarget] {
+      block-size: 100%;
+    }
+
+    &[movingtab] {
+      padding-bottom: 0;
+      margin-bottom: 0;
+
+      &::after {
+        content: "";
+        position: absolute;
+        inset: 100% 0 auto;
+        height: 15px;
+      }
+    }
+  }
+
+  #nav-bar {
+    background: var(--toolbar-background-color);
+    box-shadow: inset 0 1px var(--kanso-rule);
+  }
+
+  #urlbar, #searchbar {
+    --urlbar-border-radius: var(--kanso-radius);
+    --urlbarview-border-radius: var(--kanso-radius);
+  }
+
+  #navigator-toolbox :is(moz-button, .searchmode-switcher) {
+    --button-border-radius: var(--kanso-radius);
+  }
+
+  :is(.urlbar-background, #searchbar, .tab-background) {
+    border-radius: var(--kanso-radius);
+  }
+
+  #urlbar[focused] > .urlbar-background {
+    outline-color: var(--kanso-accent);
+  }
+
+  .tab-background:is([selected], [multiselected]) {
+    outline: var(--kanso-border-width, 1px) solid var(--kanso-accent);
+    outline-offset: calc(-1 * var(--kanso-border-width, 1px));
+    box-shadow: none;
+    background-image: none;
+  }
+
+  .tabbrowser-tab[visuallyselected] .tab-label {
+    font-weight: 650;
+  }
+
+  :is(panel, menupopup) {
+    --panel-border-radius: var(--kanso-radius);
+    --arrowpanel-border-radius: var(--kanso-radius);
+    --panel-menuitem-border-radius: var(--kanso-radius);
+    --menuitem-border-radius: var(--kanso-radius);
+    font-family: var(--kanso-interface-font, monospace), monospace;
+  }
+}

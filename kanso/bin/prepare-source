@@ -1,0 +1,20 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+project=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+cd "$project"
+overlay=$(mktemp .kanso-overlay.XXXXXXXX)
+trap 'rm -f -- "$overlay"' EXIT
+
+tar --sort=name --mtime='UTC 1970-01-01' --owner=0 --group=0 --numeric-owner \
+    --exclude='__pycache__' --transform='s|^|kanso-overlay/|' \
+    -cf - kanso-components patches tests \
+    packaging/apply-overlay packaging/kanso-browser.desktop \
+    packaging/mozconfig packaging/vendor.js |
+  gzip -n > "$overlay"
+
+sum=$(sha256sum "$overlay" | cut -d ' ' -f1)
+chmod 644 "$overlay"
+mv -- "$overlay" kanso-overlay.tar.gz
+sed -i -E "s/^  [0-9a-f]{64} # Kanso overlay$/  $sum # Kanso overlay/" PKGBUILD
+makepkg --printsrcinfo > .SRCINFO

@@ -1,0 +1,213 @@
+--- a/browser/components/moz.build
++++ b/browser/components/moz.build
+@@ -41,6 +41,7 @@
+     "firefoxview",
+     "genai",
+     "ipprotection",
++    "kanso",
+     "messagepreview",
+     "migration",
+     "mozcachedohttp",
+--- a/browser/components/BrowserGlue.sys.mjs
++++ b/browser/components/BrowserGlue.sys.mjs
+@@ -385,6 +385,9 @@
+   // runs on startup, before the first command line handler is invoked
+   // (i.e. before the first window is opened)
+   _beforeUIStartup: function BG__beforeUIStartup() {
++    ChromeUtils.importESModule(
++      "resource:///modules/kanso/OmarchyTheme.sys.mjs"
++    ).OmarchyTheme.startup();
+     lazy.SessionStartup.init();
+ 
+     // check if we're in safe mode
+--- a/toolkit/modules/LightweightThemeConsumer.sys.mjs
++++ b/toolkit/modules/LightweightThemeConsumer.sys.mjs
+@@ -9,6 +9,7 @@
+ // This allows per-app variables.
+ ChromeUtils.defineESModuleGetters(lazy, {
+   PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
++  OmarchyTheme: "resource:///modules/kanso/OmarchyTheme.sys.mjs",
+   ThemeContentPropertyList: "resource:///modules/ThemeVariableMap.sys.mjs",
+   ThemeVariableMap: "resource:///modules/ThemeVariableMap.sys.mjs",
+   BuiltInThemeConfig: "resource:///modules/BuiltInThemeConfig.sys.mjs",
+@@ -268,6 +269,7 @@
+   );
+ 
+   Services.obs.addObserver(this, "lightweight-theme-styling-update");
++  Services.obs.addObserver(this, "kanso-appearance-changed");
+ 
+   this.darkThemeMediaQuery = this._win.matchMedia("(-moz-system-dark-theme)");
+   this.darkThemeMediaQuery.addListener(this);
+@@ -291,6 +293,10 @@
+   _lastData: null,
+ 
+   observe(aSubject, aTopic) {
++    if (aTopic === "kanso-appearance-changed") {
++      this._update(this._lastData);
++      return;
++    }
+     if (aTopic != "lightweight-theme-styling-update") {
+       return;
+     }
+@@ -315,6 +321,7 @@
+     switch (aEvent.type) {
+       case "unload":
+         Services.obs.removeObserver(this, "lightweight-theme-styling-update");
++        Services.obs.removeObserver(this, "kanso-appearance-changed");
+         Services.ppmm.sharedData.delete(`theme/${this._winId}`);
+         this._aiWindowObserver?.disconnect();
+         this._aiWindowObserver = null;
+@@ -330,7 +337,7 @@
+   _update(themeData) {
+     const manager = lazy.LightweightThemeManager;
+ 
+-    // Store user's theme before replacing with aiThemeData or privateThemeData.
++    // Keep the underlying Firefox theme available when Omarchy sync is turned off.
+     this._lastData = themeData;
+     let isPrivateThemeActive = false;
+ 
+@@ -339,8 +346,16 @@
+       !lazy.PrivateBrowsingUtils.permanentPrivateBrowsing &&
+       this.BROWSER_THEME_DARK_PRIVATE_WINDOWS;
+     const themeId = themeData.theme?.id ?? DEFAULT_THEME_ID;
++    const omarchyData =
++      shouldMakePrivateWindowDark || this._isAIWindow
++        ? null
++        : lazy.OmarchyTheme.themeData;
++    if (omarchyData) {
++      themeData = omarchyData;
++    }
+     // Used to set a `theme-in-app` attribute to allow rules to apply to default/in-app themes only
+     let isDefaultOrInApp =
++      !!omarchyData ||
+       DEFAULT_THEME_ID === themeId ||
+       !!lazy.BuiltInThemeConfig.get(themeId)?.inApp;
+ 
+@@ -429,6 +444,18 @@
+     root.toggleAttribute("theme-in-app", isDefaultOrInApp);
+     // Expose the effective (post-substitution) theme id.
+     root.setAttribute("theme-effective-id", theme.id);
++    if (omarchyData && !forcedColorsThemeOverride) {
++      const font = lazy.OmarchyTheme.interfaceFont;
++      root.style.setProperty("--kanso-interface-font", font ? JSON.stringify(font) : "monospace");
++      root.style.setProperty("--kanso-accent", theme.tab_line);
++      root.style.setProperty("--kanso-radius", lazy.OmarchyTheme.radius + "px");
++      root.style.setProperty("--kanso-border-width", lazy.OmarchyTheme.borderWidth + "px");
++    } else {
++      root.style.removeProperty("--kanso-interface-font");
++      root.style.removeProperty("--kanso-accent");
++      root.style.removeProperty("--kanso-radius");
++      root.style.removeProperty("--kanso-border-width");
++    }
+     // Toolbox background images go either on the `<body>` or on the toolbox
+     // itself. For most themes and pre-nova default theme, it goes on the
+     // `<body>`. For themes that align the image in the y axis, and the nova
+--- a/browser/base/content/browser.xhtml
++++ b/browser/base/content/browser.xhtml
+@@ -39,6 +39,7 @@
+     href="chrome://browser/content/usercontext/usercontext.css"
+   />
+   <link rel="stylesheet" href="chrome://browser/skin/" />
++  <link rel="stylesheet" href="resource://kanso/chrome.css" />
+ 
+   <link rel="stylesheet" href="chrome://browser/skin/controlcenter/panel.css" />
+   <link
+--- a/browser/app/profile/firefox.js
++++ b/browser/app/profile/firefox.js
+@@ -261,7 +261,11 @@
+ // is still recorded as a user value. This lets the appearance settings and
+ // gUIDensity distinguish an explicit normal density (which must never be
+ // auto-compacted) from the automatic density (no user value).
+-sticky_pref("browser.uidensity", 0);
++sticky_pref("browser.uidensity", 1);
++pref("browser.kanso.follow-omarchy", true);
++// Keep the default text selection independent of the desktop's accent.
++pref("ui.highlight", "#006be6");
++pref("ui.highlighttext", "#ffffff");
+ // Whether Firefox will automatically override the uidensity to "touch"
+ // while the user is in a touch environment (such as Windows tablet mode).
+ // The effective default is derived at startup from browser.nova.enabled (see
+@@ -281,7 +285,7 @@
+ // collapsed sidebar would take up more than 5% of horizontal space.
+ pref("browser.compactmode.auto.threshold", "0.05");
+ // Whether Firefox will show the Compact Mode UIDensity option.
+-pref("browser.compactmode.show", false);
++pref("browser.compactmode.show", true);
+ 
+ // At startup, check if we're the default browser and prompt user if not.
+ pref("browser.shell.checkDefaultBrowser", true);
+--- a/browser/components/preferences/main.inc.xhtml
++++ b/browser/components/preferences/main.inc.xhtml
+@@ -45,6 +45,14 @@
+       data-category="paneGeneral">
+   <html:h1 data-l10n-id="language-and-appearance-header"/>
+ </hbox>
++
++<groupbox id="kansoAppearance" data-category="paneGeneral" hidden="true">
++  <label><html:h2 data-l10n-id="kanso-appearance-heading"/></label>
++  <checkbox id="kansoFollowOmarchy"
++            preference="browser.kanso.follow-omarchy"
++            data-l10n-id="kanso-appearance-follow"/>
++  <description data-l10n-id="kanso-appearance-description"/>
++</groupbox>
+ 
+ <!-- Website appearance -->
+ <html:setting-group groupid="appearance" data-category="paneGeneral" data-srd-migrated="" hidden="true"></html:setting-group>
+--- a/browser/locales/en-US/browser/preferences/preferences.ftl
++++ b/browser/locales/en-US/browser/preferences/preferences.ftl
+@@ -372,6 +372,13 @@
+ appearance-group2 =
+   .label = Website appearance
+   .description = Some websites change their colors to match your preferences. Choose your color scheme.
++
++kanso-appearance-heading = Omarchy
++kanso-appearance-follow =
++    .label = Follow the Omarchy theme
++    .accesskey = O
++    .description = Use Omarchy’s appearance in Kanso. Turn this off to use your selected Firefox theme.
++kanso-appearance-description = Kanso follows the current Omarchy palette, font, wallpaper, and Hyprland corner radius.
+ 
+ preferences-web-appearance-choice-auto3 =
+   .label = System
+--- a/browser/components/customizableui/CustomizableUI.sys.mjs
++++ b/browser/components/customizableui/CustomizableUI.sys.mjs
+@@ -366,10 +366,8 @@
+       Services.policies.isAllowed("removeHomeButtonByDefault")
+         ? null
+         : "home-button",
+-      "spring",
+       "vertical-spacer",
+       "urlbar-container",
+-      "spring",
+       "downloads-button",
+       AppConstants.MOZ_DEV_EDITION ? "developer-button" : null,
+       lazy.ippEnabled ? "ipprotection-button" : null,
+--- a/browser/components/preferences/config/appearance.mjs
++++ b/browser/components/preferences/config/appearance.mjs
+@@ -59,7 +59,13 @@
+   { id: "layout.css.prefers-color-scheme.content-override", type: "int" },
+   { id: PREF_UI_DENSITY, type: "int" },
+   { id: "browser.touchmode.auto", type: "bool" },
++  { id: "browser.kanso.follow-omarchy", type: "bool" },
+ ]);
++
++Preferences.addSetting({
++  id: "kansoFollowOmarchy",
++  pref: "browser.kanso.follow-omarchy",
++});
+ 
+ Preferences.addSetting({
+   id: "web-appearance-override-warning",
+@@ -360,6 +366,12 @@
+     headingLevel: 2,
+     items: [
+       {
++        id: "kansoFollowOmarchy",
++        l10nId: "kanso-appearance-follow",
++        control: "moz-checkbox",
++        controlAttrs: { id: "kansoFollowOmarchy" },
++      },
++      {
+         id: "web-appearance-manage-themes-link",
+         l10nId: "browser-theme-manage-link",
+         control: "moz-box-link",

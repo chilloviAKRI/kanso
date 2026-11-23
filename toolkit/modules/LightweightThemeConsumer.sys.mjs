@@ -9,6 +9,7 @@ const lazy = {};
 // This allows per-app variables.
 ChromeUtils.defineESModuleGetters(lazy, {
   PrivateBrowsingUtils: "resource://gre/modules/PrivateBrowsingUtils.sys.mjs",
+  OmarchyTheme: "resource:///modules/kanso/OmarchyTheme.sys.mjs",
   ThemeContentPropertyList: "resource:///modules/ThemeVariableMap.sys.mjs",
   ThemeVariableMap: "resource:///modules/ThemeVariableMap.sys.mjs",
   BuiltInThemeConfig: "resource:///modules/BuiltInThemeConfig.sys.mjs",
@@ -268,6 +269,7 @@ export function LightweightThemeConsumer(aDocument) {
   );
 
   Services.obs.addObserver(this, "lightweight-theme-styling-update");
+  Services.obs.addObserver(this, "kanso-appearance-changed");
 
   this.darkThemeMediaQuery = this._win.matchMedia("(-moz-system-dark-theme)");
   this.darkThemeMediaQuery.addListener(this);
@@ -291,6 +293,10 @@ LightweightThemeConsumer.prototype = {
   _lastData: null,
 
   observe(aSubject, aTopic) {
+    if (aTopic === "kanso-appearance-changed") {
+      this._update(this._lastData);
+      return;
+    }
     if (aTopic != "lightweight-theme-styling-update") {
       return;
     }
@@ -315,6 +321,7 @@ LightweightThemeConsumer.prototype = {
     switch (aEvent.type) {
       case "unload":
         Services.obs.removeObserver(this, "lightweight-theme-styling-update");
+        Services.obs.removeObserver(this, "kanso-appearance-changed");
         Services.ppmm.sharedData.delete(`theme/${this._winId}`);
         this._aiWindowObserver?.disconnect();
         this._aiWindowObserver = null;
@@ -330,7 +337,7 @@ LightweightThemeConsumer.prototype = {
   _update(themeData) {
     const manager = lazy.LightweightThemeManager;
 
-    // Store user's theme before replacing with aiThemeData or privateThemeData.
+    // Keep the underlying Firefox theme available when Omarchy sync is turned off.
     this._lastData = themeData;
     let isPrivateThemeActive = false;
 
@@ -339,8 +346,16 @@ LightweightThemeConsumer.prototype = {
       !lazy.PrivateBrowsingUtils.permanentPrivateBrowsing &&
       this.BROWSER_THEME_DARK_PRIVATE_WINDOWS;
     const themeId = themeData.theme?.id ?? DEFAULT_THEME_ID;
+    const omarchyData =
+      shouldMakePrivateWindowDark || this._isAIWindow
+        ? null
+        : lazy.OmarchyTheme.themeData;
+    if (omarchyData) {
+      themeData = omarchyData;
+    }
     // Used to set a `theme-in-app` attribute to allow rules to apply to default/in-app themes only
     let isDefaultOrInApp =
+      !!omarchyData ||
       DEFAULT_THEME_ID === themeId ||
       !!lazy.BuiltInThemeConfig.get(themeId)?.inApp;
 
@@ -429,6 +444,18 @@ LightweightThemeConsumer.prototype = {
     root.toggleAttribute("theme-in-app", isDefaultOrInApp);
     // Expose the effective (post-substitution) theme id.
     root.setAttribute("theme-effective-id", theme.id);
+    if (omarchyData && !forcedColorsThemeOverride) {
+      const font = lazy.OmarchyTheme.interfaceFont;
+      root.style.setProperty("--kanso-interface-font", font ? JSON.stringify(font) : "monospace");
+      root.style.setProperty("--kanso-accent", theme.tab_line);
+      root.style.setProperty("--kanso-radius", lazy.OmarchyTheme.radius + "px");
+      root.style.setProperty("--kanso-border-width", lazy.OmarchyTheme.borderWidth + "px");
+    } else {
+      root.style.removeProperty("--kanso-interface-font");
+      root.style.removeProperty("--kanso-accent");
+      root.style.removeProperty("--kanso-radius");
+      root.style.removeProperty("--kanso-border-width");
+    }
     // Toolbox background images go either on the `<body>` or on the toolbox
     // itself. For most themes and pre-nova default theme, it goes on the
     // `<body>`. For themes that align the image in the y axis, and the nova

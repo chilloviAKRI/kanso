@@ -41,6 +41,7 @@ DIRS += [
     "firefoxview",
     "genai",
     "ipprotection",
+    "kanso",
     "messagepreview",
     "migration",
     "mozcachedohttp",

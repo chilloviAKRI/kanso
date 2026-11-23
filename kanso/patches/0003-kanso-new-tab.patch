@@ -1,0 +1,91 @@
+--- a/browser/components/DesktopActorRegistry.sys.mjs
++++ b/browser/components/DesktopActorRegistry.sys.mjs
+@@ -673,6 +673,18 @@
+       maybeRegister();
+     },
+     safeForUntrustedWebProcess: true,
++  },
++
++  KansoAppearance: {
++    parent: {
++      esModuleURI: "resource:///modules/kanso/KansoAppearanceParent.sys.mjs",
++    },
++    child: {
++      esModuleURI: "resource:///modules/kanso/KansoAppearanceChild.sys.mjs",
++      events: { pageshow: { mozSystemGroup: true } },
++    },
++    matches: ["about:newtab"],
++    remoteTypes: ["privilegedabout"],
+   },
+ 
+   LightweightTheme: {
+--- a/browser/components/newtab/AboutNewTabRedirector.sys.mjs
++++ b/browser/components/newtab/AboutNewTabRedirector.sys.mjs
+@@ -50,6 +50,8 @@
+ 
+ const PREF_ABOUT_HOME_CACHE_TESTING =
+   "browser.startup.homepage.abouthome_cache.testing";
++
++const KANSO_NEWTAB_URL = "resource://kanso/newtab.html";
+ 
+ const CACHE_WORKER_URL = "resource://newtab/lib/cache.worker.js";
+ 
+@@ -540,7 +542,11 @@
+   newChannel(uri, loadInfo) {
+     let chromeURI = this.getChromeURI(uri);
+ 
+-    if (
++    const isKansoNewTab =
++      uri.spec === "about:newtab" && lazy.BUILTIN_NEWTAB_ENABLED;
++    if (isKansoNewTab) {
++      chromeURI = Services.io.newURI(KANSO_NEWTAB_URL);
++    } else if (
+       uri.spec.startsWith("about:home") ||
+       (uri.spec.startsWith("about:newtab") && lazy.BUILTIN_NEWTAB_ENABLED)
+     ) {
+@@ -553,7 +559,7 @@
+     );
+     resultChannel.originalURI = uri;
+ 
+-    if (!this.#addonInitialized) {
++    if (!isKansoNewTab && !this.#addonInitialized) {
+       return this.#getSuspendedChannel(resultChannel);
+     }
+ 
+@@ -614,7 +620,9 @@
+       AboutHomeStartupCacheChild.disqualifyCache();
+ 
+       if (lazy.BUILTIN_NEWTAB_ENABLED) {
+-        pageURI = Services.io.newURI(this.defaultURL);
++        pageURI = Services.io.newURI(
++          uri.spec === "about:newtab" ? KANSO_NEWTAB_URL : this.defaultURL
++        );
+       } else {
+         pageURI = this.getChromeURI(uri);
+       }
+--- a/browser/actors/ContentSearchParent.sys.mjs
++++ b/browser/actors/ContentSearchParent.sys.mjs
+@@ -216,7 +216,22 @@
+       "searchString",
+       "healthReportKey",
+     ]);
+-    let engine = lazy.SearchService.getEngineByName(data.engineName);
++    // Kanso's built-in New Tab always uses the default at submit time.
++    // Other ContentSearch clients continue to pass the engine they selected.
++    let engine;
++    if (
++      data.engineName === null &&
++      actor.manager.documentURI?.spec === "about:newtab"
++    ) {
++      engine = actor.browsingContext.usePrivateBrowsing
++        ? lazy.SearchService.defaultPrivateEngine
++        : lazy.SearchService.defaultEngine;
++    } else {
++      engine = lazy.SearchService.getEngineByName(data.engineName);
++    }
++    if (!engine) {
++      return;
++    }
+     let submission = engine.getSubmission(data.searchString, "");
+     let win = browser.documentGlobal;
+     if (!win) {

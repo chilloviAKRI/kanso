@@ -1,0 +1,100 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+  printf '%s\n' 'Usage: bin/update --check | --build | --install [--syncdeps]' >&2
+  exit 2
+}
+
+mode=${1:-}
+case "$mode" in
+  --check|--build|--install) ;;
+  *) usage ;;
+esac
+syncdeps=()
+if [[ ${2:-} == --syncdeps && $mode != --check ]]; then
+  syncdeps+=(--syncdeps)
+  shift
+fi
+[[ $# == 1 ]] || usage
+
+project=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+cache_dir="${XDG_CACHE_HOME:-$HOME/.cache}/kanso-browser"
+metadata=https://product-details.mozilla.org/1.0/firefox_versions.json
+publisher=14F26682D0916CDD81E37B6D61B7B526D98F0353
+pinned_version=160.0.1
+
+fetch() {
+  curl --fail --silent --show-error --location --retry 2 \
+    --proto '=https' --proto-redir '=https' "$@"
+}
+
+version=$(fetch "$metadata" | /usr/bin/python -c \
+  'import json, sys; print(json.load(sys.stdin)["LATEST_FIREFOX_VERSION"])')
+if [[ ! $version =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
+  printf 'Unexpected Firefox release version: %s\n' "$version" >&2
+  exit 1
+fi
+
+installed=$(pacman -Q kanso-browser 2>/dev/null | cut -d ' ' -f2 || true)
+installed=${installed%-*}
+printf 'Installed Kanso: %s\nLatest stable Firefox: %s\n' "${installed:-none}" "$version"
+if [[ $mode == --check ]]; then
+  exit 0
+fi
+if [[ $(vercmp "$version" "$pinned_version") == -1 ||
+      ( -n $installed && $(vercmp "$version" "$installed") == -1 ) ]]; then
+  printf '%s\n' 'The downloaded version would downgrade Kanso.' >&2
+  exit 1
+fi
+
+for command in makepkg flock gpg sha256sum; do
+  command -v "$command" >/dev/null || { printf 'Missing command: %s\n' "$command" >&2; exit 1; }
+done
+
+umask 077
+mkdir -p "$cache_dir"/{downloads,build,packages}
+exec 9>"$cache_dir/update.lock"
+if ! flock -n 9; then
+  printf '%s\n' 'Another Kanso build or update is running.' >&2
+  exit 1
+fi
+
+keyring=$(mktemp -d "$cache_dir/keyring.XXXXXXXX")
+trap 'rm -rf -- "$keyring"' EXIT
+gpg --batch --homedir "$keyring" --import "$project/packaging/mozilla-release.gpg"
+archive="firefox-$version.source.tar.xz"
+url="https://archive.mozilla.org/pub/firefox/releases/$version/source/$archive"
+archive_path="$cache_dir/downloads/$archive"
+for suffix in '' .asc; do
+  path="$archive_path$suffix"
+  if [[ ! -s $path ]]; then
+    fetch "$url$suffix" -o "$path.part"
+    mv -- "$path.part" "$path"
+  fi
+done
+if ! gpg --batch --homedir "$keyring" --status-fd 1 \
+       --verify "$archive_path.asc" "$archive_path" |
+       awk -v publisher="$publisher" '$2 == "VALIDSIG" && $NF == publisher { ok = 1 } END { exit !ok }'; then
+  printf 'Mozilla source signature verification failed. Check %s and its .asc file.\n' "$archive_path" >&2
+  exit 1
+fi
+
+source_sha256=$(sha256sum -- "$archive_path" | cut -d ' ' -f1)
+export GNUPGHOME="$keyring"
+export SRCDEST="$cache_dir/downloads"
+export BUILDDIR="$cache_dir/build"
+export PKGDEST="$cache_dir/packages"
+export KANSO_PKGVER="$version"
+export KANSO_SOURCE_SHA256="$source_sha256"
+cd "$project"
+
+# Leave the installed browser alone until source preparation, build and checks pass.
+# A failed rebase must exit before reaching pacman.
+makepkg --cleanbuild --force "${syncdeps[@]}"
+package=$(makepkg --packagelist)
+test -f "$package"
+if [[ $mode == --install ]]; then
+  sudo pacman -U --needed -- "$package"
+fi
+printf 'Package: %s\n' "$package"

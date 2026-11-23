@@ -51,6 +51,8 @@ XPCOMUtils.defineLazyPreferenceGetter(
 const PREF_ABOUT_HOME_CACHE_TESTING =
   "browser.startup.homepage.abouthome_cache.testing";
 
+const KANSO_NEWTAB_URL = "resource://kanso/newtab.html";
+
 const CACHE_WORKER_URL = "resource://newtab/lib/cache.worker.js";
 
 const IS_PRIVILEGED_PROCESS =
@@ -540,7 +542,11 @@ export class AboutNewTabRedirectorParent extends BaseAboutNewTabRedirector {
   newChannel(uri, loadInfo) {
     let chromeURI = this.getChromeURI(uri);
 
-    if (
+    const isKansoNewTab =
+      uri.spec === "about:newtab" && lazy.BUILTIN_NEWTAB_ENABLED;
+    if (isKansoNewTab) {
+      chromeURI = Services.io.newURI(KANSO_NEWTAB_URL);
+    } else if (
       uri.spec.startsWith("about:home") ||
       (uri.spec.startsWith("about:newtab") && lazy.BUILTIN_NEWTAB_ENABLED)
     ) {
@@ -553,7 +559,7 @@ export class AboutNewTabRedirectorParent extends BaseAboutNewTabRedirector {
     );
     resultChannel.originalURI = uri;
 
-    if (!this.#addonInitialized) {
+    if (!isKansoNewTab && !this.#addonInitialized) {
       return this.#getSuspendedChannel(resultChannel);
     }
 
@@ -614,7 +620,9 @@ export class AboutNewTabRedirectorChild extends BaseAboutNewTabRedirector {
       AboutHomeStartupCacheChild.disqualifyCache();
 
       if (lazy.BUILTIN_NEWTAB_ENABLED) {
-        pageURI = Services.io.newURI(this.defaultURL);
+        pageURI = Services.io.newURI(
+          uri.spec === "about:newtab" ? KANSO_NEWTAB_URL : this.defaultURL
+        );
       } else {
         pageURI = this.getChromeURI(uri);
       }

@@ -385,6 +385,9 @@ BrowserGlue.prototype = {
   // runs on startup, before the first command line handler is invoked
   // (i.e. before the first window is opened)
   _beforeUIStartup: function BG__beforeUIStartup() {
+    ChromeUtils.importESModule(
+      "resource:///modules/kanso/OmarchyTheme.sys.mjs"
+    ).OmarchyTheme.startup();
     lazy.SessionStartup.init();
 
     // check if we're in safe mode

@@ -59,7 +59,13 @@ Preferences.addAll([
   { id: "layout.css.prefers-color-scheme.content-override", type: "int" },
   { id: PREF_UI_DENSITY, type: "int" },
   { id: "browser.touchmode.auto", type: "bool" },
+  { id: "browser.kanso.follow-omarchy", type: "bool" },
 ]);
+
+Preferences.addSetting({
+  id: "kansoFollowOmarchy",
+  pref: "browser.kanso.follow-omarchy",
+});
 
 Preferences.addSetting({
   id: "web-appearance-override-warning",
@@ -359,6 +365,12 @@ SettingGroupManager.registerGroups({
     iconSrc: "chrome://browser/skin/customize.svg",
     headingLevel: 2,
     items: [
+      {
+        id: "kansoFollowOmarchy",
+        l10nId: "kanso-appearance-follow",
+        control: "moz-checkbox",
+        controlAttrs: { id: "kansoFollowOmarchy" },
+      },
       {
         id: "web-appearance-manage-themes-link",
         l10nId: "browser-theme-manage-link",
