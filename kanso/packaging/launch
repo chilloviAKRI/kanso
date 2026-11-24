@@ -1,0 +1,190 @@
+#!/usr/bin/python -I
+"""Launch Kanso and apply verified updates from its GitHub releases."""
+
+from contextlib import contextmanager
+import fcntl
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import subprocess
+import sys
+import tempfile
+
+
+REPO = "chilloviAKRI/kanso"
+LATEST_RELEASE = f"https://api.github.com/repos/{REPO}/releases/latest"
+SYSTEM_APP = Path("/usr/lib/kanso-browser")
+SYSTEM_COMMAND = Path("/usr/bin/kanso-browser")
+SYSTEM_LOCK = Path("/run/lock/kanso-browser.lock")
+APP = Path(__file__).resolve().parent
+VERSION = re.compile(r"[0-9]+(?:\.[0-9]+){1,2}-[0-9]+(?:\.[0-9]+)?")
+MAX_PACKAGE_SIZE = 1024**3
+MAINTENANCE = {"--version", "-version", "-v", "--help", "-help", "-h", "--headless", "-headless"}
+
+
+def run(command, *args, **options):
+    return subprocess.run([f"/usr/bin/{command}", *args], check=True, **options)
+
+
+def curl(url, *args):
+    return run("curl", "--disable", "--fail", "--silent", "--show-error", "--location",
+               "--proto", "=https", "--proto-redir", "=https", "--connect-timeout", "3",
+               *args, url, stdout=subprocess.PIPE, timeout=185).stdout
+
+
+def version_in(app):
+    version = (app / "release-version").read_text().strip()
+    if not VERSION.fullmatch(version):
+        raise ValueError("Invalid installed package version")
+    return version
+
+
+def latest_package(installed):
+    data = json.loads(curl(LATEST_RELEASE, "--max-time", "4", "--max-filesize", "1048576",
+                           "--header", "Accept: application/vnd.github+json"))
+    tag = data["tag_name"]
+    if data["draft"] or data["prerelease"] or not tag.startswith("v"):
+        return None
+    version = tag[1:]
+    if not VERSION.fullmatch(version):
+        return None
+    if run("vercmp", version, installed, capture_output=True, text=True).stdout.strip() != "1":
+        return None
+    name = f"kanso-browser-{version}-x86_64.pkg.tar.zst"
+    url = f"https://github.com/{REPO}/releases/download/{tag}/{name}"
+    for asset in data["assets"]:
+        if asset["name"] == name and asset["state"] == "uploaded" and asset["browser_download_url"] == url:
+            digest, size = asset.get("digest"), asset.get("size")
+            if (isinstance(digest, str) and re.fullmatch(r"sha256:[0-9a-f]{64}", digest)
+                    and type(size) is int and 0 < size <= MAX_PACKAGE_SIZE):
+                return version, name, url, digest[7:], size
+    raise ValueError(f"Release {tag} lacks a verifiable Arch package")
+
+
+def download_package(release, directory):
+    version, name, url, digest, size = release
+    archive = directory / name
+    curl(url, "--max-time", "180", "--max-filesize", str(size), "--output", archive)
+    with archive.open("rb") as stream:
+        if archive.stat().st_size != size or hashlib.file_digest(stream, "sha256").hexdigest() != digest:
+            raise ValueError(f"Invalid download for Kanso {version}")
+    info = run("pacman", "-Qp", "--", archive, capture_output=True, text=True).stdout.strip()
+    if info != f"kanso-browser {version}":
+        raise ValueError(f"Unexpected package metadata for Kanso {version}")
+    return archive
+
+
+def notify(version):
+    try:
+        run("notify-send", "--app-name=Kanso", "Kanso", f"Installing Kanso {version}…", timeout=2)
+    except (OSError, subprocess.SubprocessError):
+        pass
+
+
+def update_user(app, release):
+    notify(release[0])
+    with tempfile.TemporaryDirectory(prefix=".kanso-update-", dir=app.parent) as temporary:
+        directory = Path(temporary)
+        archive = download_package(release, directory)
+        run("bsdtar", "-xf", archive, "-C", directory, "usr/lib/kanso-browser")
+        replacement = directory / "usr/lib/kanso-browser"
+        if not os.access(replacement / "launch", os.X_OK) or not (replacement / "browser/omni.ja").is_file():
+            raise ValueError("Incomplete Kanso application")
+        if version_in(replacement) != release[0]:
+            raise ValueError("Application and package versions differ")
+        subprocess.run([replacement / "kanso-browser", "--version"], check=True, timeout=5,
+                       stdout=subprocess.DEVNULL)
+        run("mv", "-T", "--exchange", "--no-copy", "--", replacement, app)
+
+
+def is_running(app):
+    return subprocess.run(["/usr/bin/fuser", "-s", "--", app / "kanso-browser"]).returncode == 0
+
+
+@contextmanager
+def launch_lock(app, mode):
+    if app == SYSTEM_APP:
+        path = SYSTEM_LOCK
+        flags = os.O_RDONLY
+    else:
+        path = app.parent / ".kanso-launch.lock"
+        flags = os.O_WRONLY | os.O_CREAT
+    fd = os.open(path, flags | os.O_NOFOLLOW, 0o600)
+    try:
+        fcntl.flock(fd, mode)
+        yield
+    finally:
+        os.close(fd)
+
+
+def update_system():
+    # This entry point is run by pkexec. It accepts no caller-supplied package or URL.
+    if APP != SYSTEM_APP or os.geteuid() != 0:
+        return 1
+    with launch_lock(APP, fcntl.LOCK_EX):
+        if is_running(APP):
+            return 0
+        installed = run("pacman", "-Q", "kanso-browser", capture_output=True, text=True).stdout.split()
+        version = version_in(APP)
+        if installed != ["kanso-browser", version]:
+            raise ValueError("The package database and application versions differ")
+        if release := latest_package(version):
+            with tempfile.TemporaryDirectory(prefix="kanso-update-", dir="/var/tmp") as temporary:
+                archive = download_package(release, Path(temporary))
+                run("pacman", "-U", "--needed", "--noconfirm", "--", archive)
+    return 0
+
+
+UPDATE_ERRORS = (OSError, ValueError, KeyError, TypeError, AttributeError, subprocess.SubprocessError)
+
+
+def maybe_update(app):
+    try:
+        if is_running(app):
+            return
+        if release := latest_package(version_in(app)):
+            if app == SYSTEM_APP:
+                notify(release[0])
+                authorization = subprocess.run(
+                    ["/usr/bin/pkexec", "--disable-internal-agent", app / "launch", "--apply-system-update"]
+                )
+                if authorization.returncode not in (0, 126, 127):
+                    authorization.check_returncode()
+            else:
+                update_user(app, release)
+    except UPDATE_ERRORS as error:
+        print(f"Kanso update: {error}", file=sys.stderr)
+
+
+def launch(app, arguments):
+    if app != SYSTEM_APP and SYSTEM_COMMAND.is_file():
+        os.execv(SYSTEM_COMMAND, [str(SYSTEM_COMMAND), *arguments])
+    executable = app / "kanso-browser"
+    command = [str(executable), *arguments]
+    auto = os.getenv("KANSO_DISABLE_AUTO_UPDATE") != "1" and not MAINTENANCE.intersection(arguments)
+    if app == SYSTEM_APP and not SYSTEM_LOCK.exists():
+        os.execv(executable, command)
+
+    # The privileged updater takes the exclusive system lock after authorization.
+    # System launches hold a shared lock until Gecko has exec'd. Local installs
+    # serialize both steps using the same lock next to the application directory.
+    if app == SYSTEM_APP and auto:
+        maybe_update(app)
+    mode = fcntl.LOCK_SH if app == SYSTEM_APP else fcntl.LOCK_EX
+    with launch_lock(app, mode):
+        if app != SYSTEM_APP and auto:
+            maybe_update(app)
+        browser = subprocess.Popen(command)
+    return browser.wait()
+
+
+if __name__ == "__main__":
+    arguments = sys.argv[1:]
+    if arguments == ["--apply-system-update"]:
+        try:
+            sys.exit(update_system())
+        except UPDATE_ERRORS as error:
+            sys.exit(f"Kanso update: {error}")
+    sys.exit(launch(APP, arguments))

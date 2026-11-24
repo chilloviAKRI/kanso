@@ -1,0 +1,123 @@
+"""Check that startup updates select and install only verified Kanso packages."""
+
+import hashlib
+from importlib.machinery import SourceFileLoader
+from importlib.util import module_from_spec, spec_from_loader
+import json
+from pathlib import Path
+import subprocess
+import tempfile
+import unittest
+from unittest.mock import patch
+
+
+path = Path(__file__).resolve().parents[1] / "packaging/launch"
+loader = SourceFileLoader("kanso_launch", str(path))
+launcher = module_from_spec(spec_from_loader(loader.name, loader))
+loader.exec_module(launcher)
+
+
+def metadata(version, contents):
+    name = f"kanso-browser-{version}-x86_64.pkg.tar.zst"
+    return {
+        "tag_name": f"v{version}",
+        "draft": False,
+        "prerelease": False,
+        "assets": [{
+            "name": name,
+            "state": "uploaded",
+            "browser_download_url": f"https://github.com/{launcher.REPO}/releases/download/v{version}/{name}",
+            "digest": f"sha256:{hashlib.sha256(contents).hexdigest()}",
+            "size": len(contents),
+        }],
+    }
+
+
+class ReleaseSelection(unittest.TestCase):
+    def select(self, data, installed="160.0.1-9"):
+        with patch.object(launcher, "curl", return_value=json.dumps(data).encode()):
+            return launcher.latest_package(installed)
+
+    def test_releases_use_arch_version_order(self):
+        self.assertEqual(self.select(metadata("160.0.1-10", b"package"))[0], "160.0.1-10")
+        self.assertIsNone(self.select(metadata("160.0.1-9", b"package")))
+        self.assertIsNone(self.select(metadata("160.0.1-8", b"package")))
+
+    def test_prereleases_are_ignored(self):
+        data = metadata("160.0.1-10", b"package")
+        data["prerelease"] = True
+        self.assertIsNone(self.select(data))
+
+    def test_unverified_assets_are_rejected(self):
+        for field, value in (("digest", "bad"), ("size", 0), ("state", "new"),
+                             ("browser_download_url", "https://example.com/kanso.pkg.tar.zst")):
+            with self.subTest(field=field):
+                data = metadata("160.0.1-10", b"package")
+                data["assets"][0][field] = value
+                with self.assertRaises(ValueError):
+                    self.select(data)
+
+
+class UserUpdate(unittest.TestCase):
+    def setUp(self):
+        self.temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temporary.cleanup)
+        self.root = Path(self.temporary.name)
+        self.app = self.root / "kanso-browser"
+        self.app.mkdir()
+        (self.app / "release-version").write_text("160.0.1-9\n")
+        self.profile = self.root / "profile"
+        self.profile.write_text("saved profile")
+
+        package = self.root / "package"
+        replacement = package / "usr/lib/kanso-browser"
+        (replacement / "browser").mkdir(parents=True)
+        (replacement / "browser/omni.ja").touch()
+        (replacement / "release-version").write_text("160.0.1-10\n")
+        for name in ("launch", "kanso-browser"):
+            file = replacement / name
+            file.write_text("#!/bin/sh\nexit 0\n")
+            file.chmod(0o755)
+        (package / ".PKGINFO").write_text("pkgname = kanso-browser\npkgver = 160.0.1-10\narch = x86_64\n")
+        archive = self.root / "test.pkg.tar.zst"
+        launcher.run("bsdtar", "--zstd", "-cf", archive, "-C", package, ".PKGINFO", "usr")
+        self.contents = archive.read_bytes()
+
+    def apply(self, content):
+        def download(url, *args):
+            if url == launcher.LATEST_RELEASE:
+                return json.dumps(metadata("160.0.1-10", self.contents)).encode()
+            Path(args[args.index("--output") + 1]).write_bytes(content)
+            return b""
+
+        with patch.object(launcher, "curl", side_effect=download), patch.object(launcher, "notify"):
+            launcher.update_user(self.app, launcher.latest_package("160.0.1-9"))
+
+    def test_good_package_replaces_application_and_preserves_profile(self):
+        self.apply(self.contents)
+        self.assertEqual(launcher.version_in(self.app), "160.0.1-10")
+        self.assertEqual(self.profile.read_text(), "saved profile")
+
+    def test_corrupt_package_leaves_installed_version(self):
+        with self.assertRaises(ValueError):
+            self.apply(bytes([self.contents[0] ^ 1]) + self.contents[1:])
+        self.assertEqual(launcher.version_in(self.app), "160.0.1-9")
+        self.assertEqual(self.profile.read_text(), "saved profile")
+
+    def test_open_browser_skips_update(self):
+        with patch.object(launcher, "is_running", return_value=True), patch.object(launcher, "curl") as fetch:
+            launcher.maybe_update(self.app)
+        fetch.assert_not_called()
+
+    def test_offline_launch_uses_installed_browser(self):
+        browser = self.app / "kanso-browser"
+        browser.write_text('#!/bin/sh\ntest "$1" = https://example.com\n')
+        browser.chmod(0o755)
+        with (patch.object(launcher, "is_running", return_value=False),
+              patch.object(launcher, "curl", side_effect=subprocess.TimeoutExpired("curl", 4)),
+              patch.object(launcher, "SYSTEM_COMMAND", self.root / "no-system-install")):
+            self.assertEqual(launcher.launch(self.app, ["https://example.com"]), 0)
+
+
+if __name__ == "__main__":
+    unittest.main()

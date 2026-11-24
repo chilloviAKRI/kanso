@@ -1,16 +1,16 @@
 # Based on the Arch Linux Firefox PKGBUILD.
 pkgname=kanso-browser
 pkgver=${KANSO_PKGVER:-160.0.1}
-pkgrel=10
+pkgrel=11
 pkgdesc='Gecko browser with live Omarchy appearance'
 url='https://www.firefox.com/'
 arch=(x86_64)
 license=(MPL-2.0)
 depends=(
-  alsa-lib at-spi2-core bash cairo dbus ffmpeg fontconfig freetype2
+  alsa-lib at-spi2-core bash cairo curl dbus ffmpeg fontconfig freetype2
   gdk-pixbuf2 glib2 glibc gtk3 hicolor-icon-theme libgcc libpulse libstdc++
   libx11 libxcb libxcomposite libxdamage libxext libxfixes libxrandr libxss
-  libxt mime-types pango ttf-font
+  libxt mime-types pango polkit psmisc python ttf-font
 )
 makedepends=(
   cbindgen clang diffutils imake jack librsvg lld llvm mesa nasm nodejs python
@@ -41,7 +41,7 @@ validpgpkeys=(14F26682D0916CDD81E37B6D61B7B526D98F0353)
 sha256sums=(
   "${KANSO_SOURCE_SHA256:-7b9d95ddf24f7bbf5d0d05698bc02a66dac1eca438f80e093c5c76af7648b06d}"
   SKIP
-  8f5d8b7bd06c13fe94a4935c4c4bfefdc715a1a4cda7314f33ade944b0e4f3eb # Kanso overlay
+  733bcf4b0320b14a9a954a6d71d4adea0c041079822c24b71fad6e8b00fc80c3 # Kanso overlay
 )
 
 prepare() {
@@ -76,6 +76,7 @@ check() {
   cd "$srcdir/firefox-$pkgver"
   _gecko_env
   node --test "$srcdir/kanso-overlay/tests/palette.test.mjs"
+  python "$srcdir/kanso-overlay/tests/test_update.py"
   ./mach package
   /usr/bin/python "$srcdir/kanso-overlay/tests/smoke.py" obj-kanso/dist/kanso-browser/kanso-browser
 }
@@ -90,5 +91,9 @@ package() {
   install -Dm644 "$overlay/packaging/kanso-browser.desktop" "$pkgdir/usr/share/applications/kanso-browser.desktop"
   install -Dm644 "$overlay/kanso-components/kanso.svg" "$pkgdir/usr/share/icons/hicolor/scalable/apps/kanso-browser.svg"
   install -Dm644 LICENSE "$pkgdir/usr/share/licenses/kanso-browser/LICENSE"
+  install -Dm755 "$overlay/packaging/launch" "$appdir/launch"
+  printf '%s\n' "$pkgver-$pkgrel" > "$appdir/release-version"
+  ln -sfn "/usr/lib/$pkgname/launch" "$pkgdir/usr/bin/$pkgname"
+  install -Dm644 "$overlay/packaging/kanso-browser.conf" "$pkgdir/usr/lib/tmpfiles.d/$pkgname.conf"
   touch "$appdir/is-packaged-app"
 }

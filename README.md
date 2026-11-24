@@ -4,7 +4,9 @@ Kanso is a Firefox fork for [Omarchy](https://omarchy.org/) on Arch Linux. Its m
 
 ## Install on Omarchy
 
-Download the x86-64 package from the [Kanso releases](https://github.com/chilloviAKRI/kanso/releases) and install it with `sudo pacman -U ./kanso-browser-160.0.1-10-x86_64.pkg.tar.zst`. Open **Kanso** from the application launcher.
+Download the x86-64 package from the [Kanso releases](https://github.com/chilloviAKRI/kanso/releases) and install it with `sudo pacman -U ./kanso-browser-160.0.1-11-x86_64.pkg.tar.zst`. Open **Kanso** from the application launcher.
+
+Kanso checks GitHub Releases when it starts after being fully closed. It downloads newer versions automatically. Confirm system-wide updates in the desktop authorization dialog.
 
 See the [installation and build guide in Russian](kanso/README.md) for settings, source verification, and manual updates. The [Arch build recipe](kanso/PKGBUILD) builds Kanso from Mozilla's signed source archive and the [Kanso patches](kanso/patches/).
 
