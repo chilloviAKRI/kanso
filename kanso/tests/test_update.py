@@ -145,6 +145,7 @@ class UserUpdate(unittest.TestCase):
                         apply.assert_called_once_with(self.app)
                         self.assertEqual(restarted[0].args[0][1:], args[:2])
                         self.assertNotIn(launcher.OFFER_ENV, restarted[0].kwargs["env"])
+                        self.assertEqual(restarted[0].kwargs["env"]["MOZ_PURGE_CACHES"], "1")
 
 
 if __name__ == "__main__":

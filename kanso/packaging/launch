@@ -377,6 +377,9 @@ def launch(app, arguments):
             offer["failed"] = True
         else:
             offer = None
+            # Package revisions can change privileged JavaScript without changing
+            # the Mozilla version. Rebuild the profile's startup cache once.
+            environment["MOZ_PURGE_CACHES"] = "1"
         command = [str(browser_executable(app)), *restart_arguments(arguments)]
 
 

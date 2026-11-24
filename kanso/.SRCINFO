@@ -1,7 +1,7 @@
 pkgbase = kanso-browser
 	pkgdesc = Gecko browser with live Omarchy appearance
 	pkgver = 160.0.1
-	pkgrel = 14
+	pkgrel = 15
 	url = https://www.firefox.com/
 	arch = x86_64
 	license = MPL-2.0
@@ -76,6 +76,6 @@ pkgbase = kanso-browser
 	validpgpkeys = 14F26682D0916CDD81E37B6D61B7B526D98F0353
 	sha256sums = 7b9d95ddf24f7bbf5d0d05698bc02a66dac1eca438f80e093c5c76af7648b06d
 	sha256sums = SKIP
-	sha256sums = 20c1d46b77f091dcc7284ba63ecda945f229050afa63a50cf00371ea7a449490
+	sha256sums = 11976a4606954486ee8ba7be41e45152b80fdb487dc20e9df1e04983788e39ac
 
 pkgname = kanso-browser
