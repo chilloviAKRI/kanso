@@ -1,0 +1,33 @@
+--- a/browser/components/BrowserGlue.sys.mjs
++++ b/browser/components/BrowserGlue.sys.mjs
+@@ -385,6 +385,13 @@
+   // runs on startup, before the first command line handler is invoked
+   // (i.e. before the first window is opened)
+   _beforeUIStartup: function BG__beforeUIStartup() {
++    const onionPort = Number(Services.env.get("KANSO_ONION_PROXY_PORT"));
++    if (Number.isInteger(onionPort) && onionPort >= 1 && onionPort <= 65535) {
++      Services.prefs
++        .getDefaultBranch("")
++        .setIntPref("browser.kanso.onion.socks_port", onionPort);
++    }
++
+     ChromeUtils.importESModule(
+       "resource:///modules/kanso/OmarchyTheme.sys.mjs"
+     ).OmarchyTheme.startup();
+--- a/browser/components/profiles/SelectableProfileService.sys.mjs
++++ b/browser/components/profiles/SelectableProfileService.sys.mjs
+@@ -869,6 +869,14 @@
+     let executable =
+       ProfilesDatastoreService.constructor.getDirectory("XREExeF");
+ 
++    if (executable.leafName === "kanso-browser-bin") {
++      const launcher = executable.parent;
++      launcher.append("launch");
++      if (launcher.exists()) {
++        executable = launcher;
++      }
++    }
++
+     if (AppConstants.platform == "macosx") {
+       // Use the application bundle if possible.
+       let appBundle = executable.parent.parent.parent;

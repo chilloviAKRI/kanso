@@ -1,7 +1,7 @@
 # Based on the Arch Linux Firefox PKGBUILD.
 pkgname=kanso-browser
 pkgver=${KANSO_PKGVER:-160.0.1}
-pkgrel=13
+pkgrel=14
 pkgdesc='Gecko browser with live Omarchy appearance'
 url='https://www.firefox.com/'
 arch=(x86_64)
@@ -10,7 +10,7 @@ depends=(
   alsa-lib at-spi2-core bash cairo curl dbus ffmpeg fontconfig freetype2
   gdk-pixbuf2 glib2 glibc gtk3 hicolor-icon-theme libgcc libpulse libstdc++
   libx11 libxcb libxcomposite libxdamage libxext libxfixes libxrandr libxss
-  libxt mime-types pango polkit psmisc python ttf-font
+  libxt mime-types pango polkit psmisc python tor ttf-font
 )
 makedepends=(
   cbindgen clang diffutils imake jack librsvg lld llvm mesa nasm nodejs python
@@ -23,7 +23,6 @@ optdepends=(
   'xdg-desktop-portal: Wayland screen sharing'
   'networkmanager: Network geolocation'
   'speech-dispatcher: Text to speech'
-  'tor: Open .onion addresses through the local Tor service'
 )
 options=(!emptydirs !lto !debug !makeflags strip)
 
@@ -35,6 +34,7 @@ _patches=(
   0004-kanso-onion-routing.patch
   0005-kanso-omarchy-surfaces.patch
   0006-kanso-update-tab.patch
+  0007-kanso-managed-tor.patch
 )
 _mozilla_source="https://archive.mozilla.org/pub/firefox/releases/$pkgver/source/firefox-$pkgver.source.tar.xz"
 source=("$_mozilla_source" "$_mozilla_source.asc" kanso-overlay.tar.gz)
@@ -42,7 +42,7 @@ validpgpkeys=(14F26682D0916CDD81E37B6D61B7B526D98F0353)
 sha256sums=(
   "${KANSO_SOURCE_SHA256:-7b9d95ddf24f7bbf5d0d05698bc02a66dac1eca438f80e093c5c76af7648b06d}"
   SKIP
-  03697443068bd3d3b8122d3e46e69ba2fd882ee593820d36219f1a85ea6e844c # Kanso overlay
+  20c1d46b77f091dcc7284ba63ecda945f229050afa63a50cf00371ea7a449490 # Kanso overlay
 )
 
 prepare() {
@@ -94,6 +94,9 @@ package() {
   install -Dm644 LICENSE "$pkgdir/usr/share/licenses/kanso-browser/LICENSE"
   install -Dm755 "$overlay/packaging/launch" "$appdir/launch"
   printf '%s\n' "$pkgver-$pkgrel" > "$appdir/release-version"
+  # Older launchers restart via this path, so it must also start the Tor controller.
+  mv "$appdir/kanso-browser" "$appdir/kanso-browser-bin"
+  ln -s launch "$appdir/kanso-browser"
   ln -sfn "/usr/lib/$pkgname/launch" "$pkgdir/usr/bin/$pkgname"
   install -Dm644 "$overlay/packaging/kanso-browser.conf" "$pkgdir/usr/lib/tmpfiles.d/$pkgname.conf"
   touch "$appdir/is-packaged-app"

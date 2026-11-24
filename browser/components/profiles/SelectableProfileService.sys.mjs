@@ -869,6 +869,14 @@ class SelectableProfileServiceClass extends EventEmitter {
     let executable =
       ProfilesDatastoreService.constructor.getDirectory("XREExeF");
 
+    if (executable.leafName === "kanso-browser-bin") {
+      const launcher = executable.parent;
+      launcher.append("launch");
+      if (launcher.exists()) {
+        executable = launcher;
+      }
+    }
+
     if (AppConstants.platform == "macosx") {
       // Use the application bundle if possible.
       let appBundle = executable.parent.parent.parent;

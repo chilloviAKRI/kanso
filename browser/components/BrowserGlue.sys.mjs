@@ -385,6 +385,13 @@ BrowserGlue.prototype = {
   // runs on startup, before the first command line handler is invoked
   // (i.e. before the first window is opened)
   _beforeUIStartup: function BG__beforeUIStartup() {
+    const onionPort = Number(Services.env.get("KANSO_ONION_PROXY_PORT"));
+    if (Number.isInteger(onionPort) && onionPort >= 1 && onionPort <= 65535) {
+      Services.prefs
+        .getDefaultBranch("")
+        .setIntPref("browser.kanso.onion.socks_port", onionPort);
+    }
+
     ChromeUtils.importESModule(
       "resource:///modules/kanso/OmarchyTheme.sys.mjs"
     ).OmarchyTheme.startup();

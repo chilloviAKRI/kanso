@@ -1,5 +1,6 @@
 """Check that startup updates select and install only verified Kanso packages."""
 
+from contextlib import nullcontext
 import hashlib
 from importlib.machinery import SourceFileLoader
 from importlib.util import module_from_spec, spec_from_loader
@@ -116,6 +117,7 @@ class UserUpdate(unittest.TestCase):
         browser.chmod(0o755)
         with (patch.object(launcher, "is_running", return_value=False),
               patch.object(launcher, "curl", side_effect=subprocess.TimeoutExpired("curl", 4)),
+              patch.object(launcher, "tor_session", return_value=nullcontext(None)),
               patch.object(launcher, "SYSTEM_COMMAND", self.root / "no-system-install")):
             self.assertEqual(launcher.launch(self.app, ["https://example.com"]), 0)
 
@@ -128,6 +130,7 @@ class UserUpdate(unittest.TestCase):
 
                 with (patch.object(launcher, "check_offer", return_value=offer),
                       patch.object(launcher, "apply_offer", side_effect=simulate_install) as apply,
+                      patch.object(launcher, "tor_session", return_value=nullcontext(None)),
                       patch.object(launcher, "SYSTEM_COMMAND", self.root / "no-system-install"),
                       patch.object(launcher, "subprocess") as processes):
                     processes.Popen.return_value.wait.side_effect = [exit_code, 0]

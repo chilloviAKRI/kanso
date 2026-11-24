@@ -1,16 +1,21 @@
 #!/usr/bin/python -I
 """Launch Kanso and apply verified updates from its GitHub releases."""
 
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 import fcntl
 import hashlib
 import json
 import os
 from pathlib import Path
 import re
+import selectors
+import socket
+import socketserver
 import subprocess
 import sys
 import tempfile
+from threading import Event, Lock, Thread
+from time import monotonic
 
 
 REPO = "chilloviAKRI/kanso"
@@ -21,9 +26,153 @@ SYSTEM_LOCK = Path("/run/lock/kanso-browser.lock")
 APP = Path(__file__).resolve().parent
 UPDATE_EXIT_STATUS = 83
 OFFER_ENV = "KANSO_UPDATE_OFFER"
+ONION_PORT_ENV = "KANSO_ONION_PROXY_PORT"
 VERSION = re.compile(r"[0-9]+(?:\.[0-9]+){1,2}-[0-9]+(?:\.[0-9]+)?")
 MAX_PACKAGE_SIZE = 1024**3
-MAINTENANCE = {"--version", "-version", "-v", "--help", "-help", "-h", "--headless", "-headless"}
+INFORMATION_ONLY = {"--version", "-version", "-v", "--help", "-help", "-h"}
+MAINTENANCE = INFORMATION_ONLY | {"--headless", "-headless"}
+
+
+class OnionProxy(socketserver.ThreadingTCPServer):
+    """Wake the browser's Tor client when Gecko connects to its SOCKS endpoint."""
+
+    daemon_threads = True
+    request_queue_size = 32
+
+    def __init__(self, tor, state_dir):
+        super().__init__(("127.0.0.1", 0), OnionRequest)
+        self.tor = tor
+        self.state_dir = state_dir
+        self.stop = Event()
+        self.start_lock = Lock()
+        self.process = None
+        self.control = None
+        self.runtime = None
+
+    def start_tor(self):
+        self.state_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+        if self.runtime is None:
+            self.runtime = tempfile.TemporaryDirectory(prefix="kanso-onion-", dir="/tmp")
+        runtime = Path(self.runtime.name)
+        config = runtime / "torrc"
+        config.touch(mode=0o600)
+        self.socks = runtime / "socks"
+        self.socks.unlink(missing_ok=True)
+        control, child = socket.socketpair()
+        try:
+            args = [
+                self.tor, "--defaults-torrc", config, "-f", config,
+                "--RunAsDaemon", "0", "--ClientOnly", "1",
+                "--SocksPort", f"unix:{self.socks} OnionTrafficOnly",
+                "--SafeSocks", "1",
+                "--DataDirectory", self.state_dir,
+                "--__OwningControllerFD", str(child.fileno()), "--Log", "warn stderr",
+            ]
+            if self.tor != Path("/usr/bin/tor"):
+                data = self.tor.parent.parent / "share"
+                for option, name in (("--GeoIPFile", "geoip"), ("--GeoIPv6File", "geoip6")):
+                    if (data / name).is_file():
+                        args.extend([option, data / name])
+            self.process = subprocess.Popen(args, stdin=subprocess.DEVNULL, pass_fds=(child.fileno(),))
+        except OSError:
+            control.close()
+            raise
+        finally:
+            child.close()
+        self.control = control
+
+    def connect_to_tor(self, peer):
+        with self.start_lock:
+            if self.stop.is_set():
+                raise OSError("Tor session is closing")
+            if self.process is None or self.process.poll() is not None:
+                if self.control:
+                    self.control.close()
+                self.start_tor()
+            deadline = monotonic() + 5
+            peer.settimeout(0.25)
+            while not self.stop.is_set() and self.process.poll() is None:
+                try:
+                    peer.connect(str(self.socks))
+                    peer.settimeout(None)
+                    return
+                except (FileNotFoundError, ConnectionRefusedError, TimeoutError):
+                    if monotonic() >= deadline:
+                        break
+                    self.stop.wait(0.05)
+        raise OSError("Tor did not open its SOCKS socket")
+
+    def close_tor(self):
+        with self.start_lock:
+            if self.control:
+                self.control.close()
+            if self.process:
+                try:
+                    self.process.wait(timeout=3)
+                except subprocess.TimeoutExpired:
+                    self.process.kill()
+                    self.process.wait()
+            if self.runtime:
+                self.runtime.cleanup()
+
+
+class OnionRequest(socketserver.BaseRequestHandler):
+    def handle(self):
+        with socket.socket(socket.AF_UNIX) as tor:
+            try:
+                self.server.connect_to_tor(tor)
+            except OSError as error:
+                if not self.server.stop.is_set():
+                    print(f"Kanso Tor: {error}", file=sys.stderr)
+                return
+
+            with selectors.DefaultSelector() as selector:
+                selector.register(self.request, selectors.EVENT_READ, tor)
+                selector.register(tor, selectors.EVENT_READ, self.request)
+                try:
+                    while selector.get_map() and not self.server.stop.is_set():
+                        for source, _ in selector.select(0.2):
+                            target = source.data
+                            if data := source.fileobj.recv(65536):
+                                target.sendall(data)
+                            else:
+                                selector.unregister(source.fd)
+                                target.shutdown(socket.SHUT_WR)
+                except OSError:
+                    pass
+
+
+@contextmanager
+def tor_session(arguments):
+    if INFORMATION_ONLY.intersection(arguments):
+        yield None
+        return
+    tor = Path("/usr/bin/tor")
+    if not tor.is_file():
+        data = Path(os.environ.get("XDG_DATA_HOME") or Path.home() / ".local/share")
+        tor = data / "kanso-tor/bin/tor"
+    if not os.access(tor, os.X_OK):
+        yield None
+        return
+
+    state = Path(os.environ.get("XDG_STATE_HOME") or Path.home() / ".local/state")
+    profile = [arg for arg in restart_arguments(arguments) if arg not in {"--no-remote", "-no-remote"}]
+    key = hashlib.sha256(os.fsencode("\0".join(profile))).hexdigest()[:16] if profile else "default"
+    try:
+        server = OnionProxy(tor, state / "kanso-browser/tor" / key)
+    except OSError as error:
+        print(f"Kanso Tor: {error}", file=sys.stderr)
+        yield None
+        return
+    with server:
+        worker = Thread(target=server.serve_forever, kwargs={"poll_interval": 0.1}, daemon=True)
+        worker.start()
+        try:
+            yield server.server_address[1]
+        finally:
+            server.stop.set()
+            server.shutdown()
+            server.close_tor()
 
 
 def run(command, *args, **options):
@@ -41,6 +190,11 @@ def version_in(app):
     if not VERSION.fullmatch(version):
         raise ValueError("Invalid installed package version")
     return version
+
+
+def browser_executable(app):
+    native = app / "kanso-browser-bin"
+    return native if native.is_file() else app / "kanso-browser"
 
 
 def latest_package(installed):
@@ -89,7 +243,10 @@ def update_user(app, release):
             raise ValueError("Incomplete Kanso application")
         if version_in(replacement) != release[0]:
             raise ValueError("Application and package versions differ")
-        subprocess.run([replacement / "kanso-browser", "--version"], check=True, timeout=5,
+        executable = browser_executable(replacement)
+        if executable.resolve() == (replacement / "launch").resolve():
+            raise ValueError("Kanso package is missing its native executable")
+        subprocess.run([executable, "--version"], check=True, timeout=5,
                        stdout=subprocess.DEVNULL)
         if is_running(app):
             return
@@ -97,7 +254,8 @@ def update_user(app, release):
 
 
 def is_running(app):
-    return subprocess.run(["/usr/bin/fuser", "-s", app / "kanso-browser"]).returncode == 0
+    executable = browser_executable(app)
+    return executable.is_file() and subprocess.run(["/usr/bin/fuser", "-s", executable]).returncode == 0
 
 
 @contextmanager
@@ -186,13 +344,12 @@ def restart_arguments(arguments):
 def launch(app, arguments):
     if app != SYSTEM_APP and SYSTEM_COMMAND.is_file():
         os.execv(SYSTEM_COMMAND, [str(SYSTEM_COMMAND), *arguments])
-    executable = app / "kanso-browser"
-    command = [str(executable), *arguments]
-    auto = os.getenv("KANSO_DISABLE_AUTO_UPDATE") != "1" and not MAINTENANCE.intersection(arguments)
+    command = [str(browser_executable(app)), *arguments]
+    locked = app != SYSTEM_APP or SYSTEM_LOCK.exists()
+    auto = locked and os.getenv("KANSO_DISABLE_AUTO_UPDATE") != "1" and not MAINTENANCE.intersection(arguments)
     environment = dict(os.environ)
     environment.pop(OFFER_ENV, None)
-    if app == SYSTEM_APP and not SYSTEM_LOCK.exists():
-        os.execve(executable, command, environment)
+    environment.pop(ONION_PORT_ENV, None)
 
     # The privileged updater takes the exclusive system lock after authorization.
     # System launches hold a shared lock until Gecko has exec'd. Local installs
@@ -200,24 +357,27 @@ def launch(app, arguments):
     mode = fcntl.LOCK_SH if app == SYSTEM_APP else fcntl.LOCK_EX
     offer = None
     while True:
-        with launch_lock(app, mode):
-            if auto:
-                offer = check_offer(app)
-                auto = False
-            if offer:
-                environment[OFFER_ENV] = json.dumps(offer)
-            browser = subprocess.Popen(command, env=environment.copy())
-        status = browser.wait()
+        with tor_session(arguments) as port:
+            child_env = environment.copy()
+            if port:
+                child_env[ONION_PORT_ENV] = str(port)
+            with launch_lock(app, mode) if locked else nullcontext():
+                if auto:
+                    offer = check_offer(app)
+                    auto = False
+                if offer:
+                    child_env[OFFER_ENV] = json.dumps(offer)
+                browser = subprocess.Popen(command, env=child_env)
+            status = browser.wait()
         if status != UPDATE_EXIT_STATUS or not offer:
             return status
 
         apply_offer(app)
-        environment.pop(OFFER_ENV)
         if version_in(app) == offer["installed"]:
             offer["failed"] = True
         else:
             offer = None
-        command = [str(executable), *restart_arguments(arguments)]
+        command = [str(browser_executable(app)), *restart_arguments(arguments)]
 
 
 if __name__ == "__main__":
