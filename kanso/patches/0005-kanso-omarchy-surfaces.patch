@@ -1,0 +1,41 @@
+--- a/browser/components/DesktopActorRegistry.sys.mjs
++++ b/browser/components/DesktopActorRegistry.sys.mjs
+@@ -2,6 +2,7 @@
+  * License, v. 2.0. If a copy of the MPL was not distributed with this
+  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+ 
++import { SURFACE_MATCHES } from "resource:///modules/kanso/KansoSurfaces.sys.mjs";
+ import { ActorManagerParent } from "resource://gre/modules/ActorManagerParent.sys.mjs";
+ 
+ const lazy = {};
+@@ -681,10 +682,15 @@
+     },
+     child: {
+       esModuleURI: "resource:///modules/kanso/KansoAppearanceChild.sys.mjs",
+-      events: { pageshow: { mozSystemGroup: true } },
+-    },
+-    matches: ["about:newtab"],
+-    remoteTypes: ["privilegedabout"],
++      events: {
++        DOMContentLoaded: { mozSystemGroup: true },
++        pageshow: { mozSystemGroup: true },
++      },
++    },
++    includeChrome: true,
++    allFrames: true,
++    matches: SURFACE_MATCHES,
++    remoteTypes: ["parent", "privilegedabout", "privilegedmozilla"],
+   },
+ 
+   LightweightTheme: {
+--- a/browser/components/aboutlogins/content/aboutLogins.html
++++ b/browser/components/aboutlogins/content/aboutLogins.html
+@@ -238,7 +238,7 @@
+       <link rel="stylesheet" href="chrome://browser/content/aboutlogins/common.css">
+       <link rel="stylesheet" href="chrome://browser/content/aboutlogins/components/login-intro.css">
+ 
+-      <img class="illustration" src="chrome://global/content/megalist/icons/cpm-fox-illustration.svg" alt=""/>
++      <img class="illustration" part="illustration" src="chrome://global/content/megalist/icons/cpm-fox-illustration.svg" alt=""/>
+       <h1 class="heading" data-l10n-id="about-logins-login-intro-heading-message"></h1>
+       <section>
+         <p class="description" data-l10n-id="login-intro-description2">

@@ -114,20 +114,21 @@
    <link
 --- a/browser/app/profile/firefox.js
 +++ b/browser/app/profile/firefox.js
-@@ -261,7 +261,11 @@
+@@ -261,7 +261,12 @@
  // is still recorded as a user value. This lets the appearance settings and
  // gUIDensity distinguish an explicit normal density (which must never be
  // auto-compacted) from the automatic density (no user value).
 -sticky_pref("browser.uidensity", 0);
 +sticky_pref("browser.uidensity", 1);
 +pref("browser.kanso.follow-omarchy", true);
++pref("browser.kanso.onion.socks_port", 9050);
 +// Keep the default text selection independent of the desktop's accent.
 +pref("ui.highlight", "#006be6");
 +pref("ui.highlighttext", "#ffffff");
  // Whether Firefox will automatically override the uidensity to "touch"
  // while the user is in a touch environment (such as Windows tablet mode).
  // The effective default is derived at startup from browser.nova.enabled (see
-@@ -281,7 +285,7 @@
+@@ -281,7 +286,7 @@
  // collapsed sidebar would take up more than 5% of horizontal space.
  pref("browser.compactmode.auto.threshold", "0.05");
  // Whether Firefox will show the Compact Mode UIDensity option.

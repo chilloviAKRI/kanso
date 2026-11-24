@@ -209,18 +209,21 @@ export const OmarchyTheme = {
     return this.enabled && this.font;
   },
 
-  get newTabAppearance() {
+  getAppearance(includeWallpaper = false) {
     if (!this.enabled || !this.palette) {
       return null;
     }
-    const { mode, background, foreground, accent, border: muted } = this.palette;
-    return {
-      mode, background, foreground, accent, muted,
-      wallpaperColors: this.wallpaper?.colors ?? [],
+    const appearance = {
+      ...this.palette,
+      muted: this.palette.border,
       font: this.font ?? null,
       radius: this.radius,
       borderWidth: this.borderWidth,
     };
+    if (includeWallpaper) {
+      appearance.wallpaperColors = this.wallpaper?.colors ?? [];
+    }
+    return appearance;
   },
 
   notify() {

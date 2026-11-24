@@ -1,7 +1,7 @@
 pkgbase = kanso-browser
 	pkgdesc = Gecko browser with live Omarchy appearance
 	pkgver = 160.0.1
-	pkgrel = 6
+	pkgrel = 10
 	url = https://www.firefox.com/
 	arch = x86_64
 	license = MPL-2.0
@@ -60,6 +60,7 @@ pkgbase = kanso-browser
 	optdepends = xdg-desktop-portal: Wayland screen sharing
 	optdepends = networkmanager: Network geolocation
 	optdepends = speech-dispatcher: Text to speech
+	optdepends = tor: Open .onion addresses through the local Tor service
 	options = !emptydirs
 	options = !lto
 	options = !debug
@@ -71,6 +72,6 @@ pkgbase = kanso-browser
 	validpgpkeys = 14F26682D0916CDD81E37B6D61B7B526D98F0353
 	sha256sums = 7b9d95ddf24f7bbf5d0d05698bc02a66dac1eca438f80e093c5c76af7648b06d
 	sha256sums = SKIP
-	sha256sums = df2f2b252525fe0a71e97d5e367cbb117000ee0aea8428d210d749ee75a4e0c8
+	sha256sums = 8f5d8b7bd06c13fe94a4935c4c4bfefdc715a1a4cda7314f33ade944b0e4f3eb
 
 pkgname = kanso-browser

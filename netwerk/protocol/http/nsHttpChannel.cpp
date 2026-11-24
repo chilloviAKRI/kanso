@@ -137,6 +137,7 @@
 #include "nsNetCID.h"
 #include "nsNetUtil.h"
 #include "nsPrintfCString.h"
+#include "nsProtocolProxyService.h"
 #include "nsQueryObject.h"
 #include "nsStreamUtils.h"
 #include "nsString.h"
@@ -8068,7 +8069,9 @@ void nsHttpChannel::MaybeResolveProxyAndBeginConnect() {
     nsCOMPtr<nsIProtocolProxyService> pps =
         mozilla::components::ProtocolProxy::Service();
     nsCOMPtr<nsIProtocolProxyService2> pps2 = do_QueryInterface(pps);
-    if (pps2 && pps2->IsEffectivelyDirect()) {
+    nsIURI* proxyURI = mProxyURI ? mProxyURI.get() : mURI.get();
+    if (pps2 && pps2->IsEffectivelyDirect() &&
+        !nsProtocolProxyService::IsOnionURI(proxyURI)) {
       mozilla::glean::networking::proxy_fast_path_used.Add(1);
       MaybeStartDNSPrefetch();
     } else if (NS_SUCCEEDED(ResolveProxy())) {

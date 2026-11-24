@@ -87,6 +87,7 @@ export function parsePalette(source, legacyLight = false) {
   const surface = values.lighter_background ?? blend(background, foreground, 0.08);
   const selection = values.selection ?? blend(background, foreground, 0.18);
   const border = values.muted ?? values.color8 ?? blend(background, foreground, 0.28);
+  const action = readable(accent, surface);
 
   return {
     mode,
@@ -99,6 +100,8 @@ export function parsePalette(source, legacyLight = false) {
     surfaceText: readable(foreground, surface),
     selection,
     selectionText: readable(foreground, selection),
+    action,
+    actionText: readable(background, action),
     border,
   };
 }

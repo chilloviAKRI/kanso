@@ -1,7 +1,7 @@
 # Based on the Arch Linux Firefox PKGBUILD.
 pkgname=kanso-browser
 pkgver=${KANSO_PKGVER:-160.0.1}
-pkgrel=6
+pkgrel=10
 pkgdesc='Gecko browser with live Omarchy appearance'
 url='https://www.firefox.com/'
 arch=(x86_64)
@@ -23,6 +23,7 @@ optdepends=(
   'xdg-desktop-portal: Wayland screen sharing'
   'networkmanager: Network geolocation'
   'speech-dispatcher: Text to speech'
+  'tor: Open .onion addresses through the local Tor service'
 )
 options=(!emptydirs !lto !debug !makeflags strip)
 
@@ -31,6 +32,8 @@ _patches=(
   0001-kanso-branding.patch
   0002-omarchy-browser-chrome.patch
   0003-kanso-new-tab.patch
+  0004-kanso-onion-routing.patch
+  0005-kanso-omarchy-surfaces.patch
 )
 _mozilla_source="https://archive.mozilla.org/pub/firefox/releases/$pkgver/source/firefox-$pkgver.source.tar.xz"
 source=("$_mozilla_source" "$_mozilla_source.asc" kanso-overlay.tar.gz)
@@ -38,7 +41,7 @@ validpgpkeys=(14F26682D0916CDD81E37B6D61B7B526D98F0353)
 sha256sums=(
   "${KANSO_SOURCE_SHA256:-7b9d95ddf24f7bbf5d0d05698bc02a66dac1eca438f80e093c5c76af7648b06d}"
   SKIP
-  df2f2b252525fe0a71e97d5e367cbb117000ee0aea8428d210d749ee75a4e0c8 # Kanso overlay
+  8f5d8b7bd06c13fe94a4935c4c4bfefdc715a1a4cda7314f33ade944b0e4f3eb # Kanso overlay
 )
 
 prepare() {

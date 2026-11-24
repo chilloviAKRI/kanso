@@ -3,6 +3,7 @@
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
 import { CHANGED_TOPIC, OmarchyTheme } from "resource:///modules/kanso/OmarchyTheme.sys.mjs";
+import { surfaceForURL } from "resource:///modules/kanso/KansoSurfaces.sys.mjs";
 
 export class KansoAppearanceParent extends JSWindowActorParent {
   onAppearanceChanged = () => this.update();
@@ -24,14 +25,17 @@ export class KansoAppearanceParent extends JSWindowActorParent {
   update() {
     if (
       this.browsingContext.currentWindowGlobal !== this.manager ||
-      this.manager.documentURI?.spec !== "about:newtab" ||
       this.manager.documentPrincipal.originAttributes.privateBrowsingId
     ) {
       return;
     }
 
-    this.sendAsyncMessage("Kanso:Appearance", {
-      appearance: OmarchyTheme.newTabAppearance,
-    });
+    const surface = surfaceForURL(this.manager.documentURI?.spec);
+    if (surface) {
+      this.sendAsyncMessage("Kanso:Appearance", {
+        surface,
+        appearance: OmarchyTheme.getAppearance(surface === "newtab"),
+      });
+    }
   }
 }

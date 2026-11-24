@@ -263,6 +263,7 @@ pref("browser.uitour.surveyDuration", 7200);
 // auto-compacted) from the automatic density (no user value).
 sticky_pref("browser.uidensity", 1);
 pref("browser.kanso.follow-omarchy", true);
+pref("browser.kanso.onion.socks_port", 9050);
 // Keep the default text selection independent of the desktop's accent.
 pref("ui.highlight", "#006be6");
 pref("ui.highlighttext", "#ffffff");

@@ -1,0 +1,341 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+@media (forced-colors: none) {
+  :root[omarchy][kanso-page] {
+    --kanso-line: color-mix(in srgb, var(--omarchy-muted) 65%, var(--omarchy-background));
+    --kanso-control-border: color-mix(in srgb, var(--omarchy-foreground) 44%, var(--omarchy-surface));
+    --kanso-hover: color-mix(in srgb, var(--omarchy-accent) 13%, var(--omarchy-surface));
+    --kanso-active: color-mix(in srgb, var(--omarchy-accent) 21%, var(--omarchy-surface));
+    --kanso-small-radius: min(5px, var(--kanso-radius));
+    --kanso-stroke: max(1px, var(--kanso-border-width));
+
+    color-scheme: var(--kanso-color-scheme);
+    color: var(--omarchy-foreground);
+    background-color: var(--omarchy-background);
+    font-family: var(--kanso-font, ui-monospace), monospace;
+    scrollbar-color: var(--omarchy-muted) transparent;
+
+    --background-color-canvas: var(--omarchy-background);
+    --background-color-box: var(--omarchy-surface);
+    --background-color-box-info: var(--omarchy-surface);
+    --text-color: var(--omarchy-foreground);
+    --text-color-deemphasized: color-mix(in srgb, var(--omarchy-foreground) 78%, var(--omarchy-background));
+    --text-color-disabled: color-mix(in srgb, var(--omarchy-foreground) 51%, var(--omarchy-background));
+    --icon-color: var(--omarchy-foreground);
+    --border-color: var(--kanso-line);
+    --border-color-deemphasized: var(--kanso-line);
+    --border-color-interactive: var(--kanso-control-border);
+    --border-color-interactive-hover: var(--omarchy-accent);
+    --border-color-interactive-active: var(--omarchy-accent);
+    --border-color-selected: var(--omarchy-accent);
+
+    --color-accent-primary: var(--omarchy-action);
+    --color-accent-primary-hover: var(--omarchy-action);
+    --color-accent-primary-active: var(--omarchy-action);
+    --color-accent-primary-selected: var(--omarchy-action);
+    --text-color-accent-primary-selected: var(--omarchy-action-text);
+    --focus-outline-color: var(--omarchy-accent);
+    --link-color: var(--omarchy-action);
+    --link-color-hover: var(--omarchy-action);
+    --link-color-active: var(--omarchy-action);
+    --link-color-visited: var(--omarchy-action);
+    --link-border-radius-focus: var(--kanso-small-radius);
+
+    --border-radius-xsmall: var(--kanso-small-radius);
+    --border-radius-small: var(--kanso-small-radius);
+    --border-radius-medium: var(--kanso-radius);
+    --border-radius-large: var(--kanso-radius);
+    --border-radius-xlarge: var(--kanso-radius);
+    --button-border-radius: var(--kanso-radius);
+    --input-search-border-radius: var(--kanso-radius);
+    --input-background-color: var(--omarchy-background);
+    --input-color: var(--omarchy-foreground);
+    --input-border-color: var(--kanso-control-border);
+    --button-background-color: var(--omarchy-surface);
+    --button-background-color-hover: var(--kanso-hover);
+    --button-background-color-active: var(--kanso-active);
+    --button-background-color-selected: var(--omarchy-selection);
+    --button-background-color-ghost-hover: var(--kanso-hover);
+    --button-background-color-ghost-active: var(--kanso-active);
+    --button-background-color-primary: var(--omarchy-action);
+    --button-background-color-primary-hover: var(--omarchy-action);
+    --button-background-color-primary-active: var(--omarchy-action);
+    --button-text-color: var(--omarchy-foreground);
+    --button-text-color-hover: var(--omarchy-foreground);
+    --button-text-color-active: var(--omarchy-foreground);
+    --button-text-color-selected: var(--omarchy-selection-text);
+    --button-text-color-primary: var(--omarchy-action-text);
+    --button-text-color-primary-hover: var(--omarchy-action-text);
+    --button-text-color-primary-active: var(--omarchy-action-text);
+    --button-border-color: var(--kanso-line);
+    --button-border-color-hover: var(--omarchy-accent);
+    --button-border-color-active: var(--omarchy-accent);
+    --button-border-color-ghost: transparent;
+    --button-border-color-ghost-hover: transparent;
+    --button-border-color-ghost-active: transparent;
+    --button-border-color-primary-hover: var(--omarchy-action-text);
+    --button-border-color-primary-active: var(--omarchy-action-text);
+
+    --card-background-color: var(--omarchy-surface);
+    --card-border-color: var(--kanso-line);
+    --card-border-width: 1px;
+    --card-border-radius: var(--kanso-radius);
+    --card-border-radius-compact: var(--kanso-small-radius);
+    --card-box-shadow: none;
+    --popup-border-radius: var(--kanso-radius);
+    --panel-border-radius: var(--kanso-radius);
+    --panel-background-color: var(--omarchy-surface);
+    --panel-text-color: var(--omarchy-surface-text);
+    --panel-border-color: var(--omarchy-muted);
+    --panel-separator-color: var(--kanso-line);
+    --panel-menuitem-border-radius: var(--kanso-small-radius);
+    --in-content-page-background: var(--omarchy-background);
+    --in-content-page-color: var(--omarchy-foreground);
+    --in-content-box-background: var(--omarchy-surface);
+    --in-content-box-border-color: var(--kanso-line);
+    --in-content-accent-color: var(--omarchy-action);
+
+    body {
+      color: var(--text-color);
+      background-color: var(--background-color-canvas);
+      font-family: inherit;
+    }
+
+    :is(button, input, select, textarea, tree, richlistbox) {
+      font-family: inherit;
+    }
+
+    :is(input, select, textarea) {
+      accent-color: var(--omarchy-action);
+    }
+
+    moz-checkbox {
+      --checkbox-border-radius: var(--kanso-small-radius);
+    }
+
+    moz-toggle {
+      --toggle-border-radius: var(--kanso-small-radius);
+      --toggle-border-color: var(--kanso-control-border);
+    }
+
+    moz-visual-picker-item {
+      --visual-picker-item-border-width-checked: max(2px, var(--kanso-border-width));
+      --visual-picker-item-border-radius: var(--kanso-radius);
+    }
+
+    :is(moz-page-nav, moz-page-nav-button) {
+      --page-nav-button-border-radius: var(--kanso-small-radius);
+      --page-nav-button-border-radius-focused: var(--kanso-small-radius);
+      --page-nav-button-background-color: transparent;
+      --page-nav-button-background-color-hover: var(--kanso-hover);
+      --page-nav-button-background-color-active: var(--kanso-active);
+      --page-nav-button-background-color-selected: var(--kanso-hover);
+      --page-nav-button-text-color: var(--omarchy-foreground);
+      --page-nav-button-text-color-hover: var(--omarchy-foreground);
+      --page-nav-button-text-color-active: var(--omarchy-foreground);
+      --page-nav-button-text-color-selected: var(--omarchy-action);
+      --page-nav-button-indicator-width: var(--kanso-stroke);
+      --page-nav-button-indicator-background-color: var(--omarchy-accent);
+      --page-nav-button-padding: 8px 10px;
+      --page-nav-button-gap: 3px;
+      --page-nav-hr-background-color: var(--kanso-line);
+    }
+
+    :is(dialog, .dialogBox) {
+      border-radius: var(--kanso-radius);
+      border-color: var(--omarchy-accent);
+      border-width: var(--kanso-stroke);
+      background-color: var(--omarchy-surface);
+      color: var(--omarchy-surface-text);
+    }
+
+    :is(panel, menupopup) {
+      font-family: inherit;
+      --panel-border-radius: var(--kanso-radius);
+      --menuitem-border-radius: var(--kanso-small-radius);
+
+      &::part(content) {
+        border-width: var(--kanso-stroke);
+      }
+
+      > :is(menu, menuitem)[_moz-menuactive]:not([disabled]) {
+        color: var(--omarchy-foreground);
+        background-color: var(--kanso-hover);
+      }
+    }
+
+    &[kanso-page="preferences"] {
+      --page-space-block-start: clamp(22px, 4vh, 44px);
+      --font-weight-heading: 650;
+
+      #categories {
+        --page-nav-margin-inline-start: 0px;
+        --page-nav-gap: 14px;
+        --page-nav-border-color: var(--kanso-line);
+        --page-nav-margin-block-start: var(--page-space-block-start);
+        background-color: var(--omarchy-frame);
+        color: var(--omarchy-frame-text);
+        width: clamp(238px, 21vw, 280px);
+        padding-inline: 20px 16px;
+        padding-block-end: 16px;
+        box-sizing: border-box;
+      }
+
+      .main-content {
+        box-sizing: border-box;
+        min-inline-size: 0;
+        padding-inline: clamp(20px, 4.4vw, 64px);
+      }
+
+      .pane-container {
+        width: min(100%, 900px);
+        min-width: 0;
+      }
+
+      #search-container {
+        --search-container-padding: 14px;
+      }
+
+      #searchInput {
+        --input-background-color: var(--omarchy-surface);
+        --input-search-border-radius: var(--kanso-radius);
+      }
+
+      h1 {
+        font-weight: 650;
+        font-size: 1.6rem;
+        letter-spacing: -0.02em;
+        padding-block-end: 10px;
+        border-block-end: 1px solid var(--kanso-line);
+      }
+
+      moz-card {
+        --card-padding-block: 16px;
+        --card-padding-inline: 18px;
+        --card-heading-font-weight: 650;
+      }
+
+      @media (max-width: 950px) {
+        #categories {
+          width: auto;
+          padding-inline: 9px;
+        }
+
+        .main-content {
+          padding-inline: 16px;
+        }
+      }
+    }
+
+    &[kanso-page="addons"] {
+      --in-content-box-background: var(--omarchy-surface);
+
+      :is(#sidebar, .sidebar) {
+        background-color: var(--omarchy-frame);
+        color: var(--omarchy-frame-text);
+      }
+
+      :is(.addon-card, .card, .discopane-notice) {
+        border-color: var(--kanso-line);
+        border-radius: var(--kanso-radius);
+        box-shadow: none;
+      }
+
+      .category[selected] {
+        background-color: var(--kanso-hover);
+        color: var(--omarchy-action);
+      }
+    }
+
+    &[kanso-page="firefoxview"] {
+      --fxview-background-color: var(--omarchy-background);
+      --fxview-background-color-secondary: var(--omarchy-surface);
+      --fxview-text-primary-color: var(--omarchy-foreground);
+      --fxview-element-background-hover: var(--kanso-hover);
+      --fxview-element-background-active: var(--kanso-active);
+      --fxview-primary-action-background: var(--omarchy-action);
+      --newtab-primary-action-background: var(--omarchy-action);
+      --fxview-margin-top: clamp(22px, 4vh, 44px);
+
+      moz-page-nav {
+        --page-nav-margin-block-start: var(--fxview-margin-top);
+      }
+
+      fxview-empty-state::part(image) {
+        filter: grayscale(1);
+        opacity: 0.65;
+      }
+    }
+
+    &[kanso-page="logins"] {
+      --in-content-button-background: var(--omarchy-surface);
+      --in-content-button-background-hover: var(--kanso-hover);
+
+      login-intro::part(illustration) {
+        content: url("chrome://browser/skin/login.svg");
+        inline-size: 72px;
+        block-size: 72px;
+        padding: 16px;
+        box-sizing: border-box;
+        border: var(--kanso-stroke) solid var(--omarchy-accent);
+        border-radius: var(--kanso-radius);
+        background-color: var(--omarchy-surface);
+        -moz-context-properties: fill;
+        fill: var(--omarchy-action);
+      }
+    }
+
+    &[kanso-page="protections"] {
+      --feature-banner-color: var(--omarchy-surface);
+
+      .card {
+        background-color: var(--omarchy-surface);
+        border-color: var(--kanso-line);
+        border-radius: var(--kanso-radius);
+        box-shadow: none;
+      }
+    }
+
+    &:is([kanso-page="library"], [kanso-page="downloads"], [kanso-page="sidebar"]) {
+      color: var(--omarchy-foreground);
+      background-color: var(--omarchy-background);
+
+      :is(#placesToolbar, #placesList, #detailsPane, #downloadsListBox, .sidebar-panel) {
+        color: var(--omarchy-foreground);
+        background-color: var(--omarchy-surface);
+      }
+
+      tree {
+        color: var(--omarchy-foreground);
+        background-color: var(--omarchy-background);
+      }
+
+      treechildren::-moz-tree-row(selected) {
+        background-color: var(--omarchy-selection);
+      }
+
+      treechildren::-moz-tree-cell-text(selected) {
+        color: var(--omarchy-selection-text);
+      }
+
+      richlistitem[selected] {
+        color: var(--omarchy-selection-text);
+        background-color: var(--omarchy-selection);
+      }
+    }
+
+    &[kanso-page="diagnostics"] {
+      :is(th, .title-column, .treeHeader) {
+        background-color: var(--omarchy-surface);
+        color: var(--omarchy-surface-text);
+        border-color: var(--kanso-line);
+      }
+
+      td {
+        border-color: var(--kanso-line);
+      }
+    }
+  }
+}

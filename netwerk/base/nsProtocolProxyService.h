@@ -52,6 +52,8 @@ class nsProtocolProxyService final : public nsIProtocolProxyService2,
 
   nsresult Init();
 
+  static bool IsOnionURI(nsIURI* aURI);
+
  public:
   // An instance of this struct is allocated for each registered
   // nsIProtocolProxyFilter and each nsIProtocolProxyChannelFilter.

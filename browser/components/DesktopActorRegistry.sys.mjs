@@ -2,6 +2,7 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
 
+import { SURFACE_MATCHES } from "resource:///modules/kanso/KansoSurfaces.sys.mjs";
 import { ActorManagerParent } from "resource://gre/modules/ActorManagerParent.sys.mjs";
 
 const lazy = {};
@@ -681,10 +682,15 @@ let JSWINDOWACTORS = {
     },
     child: {
       esModuleURI: "resource:///modules/kanso/KansoAppearanceChild.sys.mjs",
-      events: { pageshow: { mozSystemGroup: true } },
+      events: {
+        DOMContentLoaded: { mozSystemGroup: true },
+        pageshow: { mozSystemGroup: true },
+      },
     },
-    matches: ["about:newtab"],
-    remoteTypes: ["privilegedabout"],
+    includeChrome: true,
+    allFrames: true,
+    matches: SURFACE_MATCHES,
+    remoteTypes: ["parent", "privilegedabout", "privilegedmozilla"],
   },
 
   LightweightTheme: {

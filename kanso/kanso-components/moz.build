@@ -5,6 +5,7 @@
 EXTRA_JS_MODULES.kanso += [
     "KansoAppearanceChild.sys.mjs",
     "KansoAppearanceParent.sys.mjs",
+    "KansoSurfaces.sys.mjs",
     "OmarchyPalette.sys.mjs",
     "OmarchyTheme.sys.mjs",
 ]

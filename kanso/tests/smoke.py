@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 import shutil
 import socket
+from socketserver import StreamRequestHandler, ThreadingTCPServer
 import struct
 import subprocess
 import tempfile
@@ -143,10 +144,11 @@ def verify_selection_colors(browser):
 
 
 @contextmanager
-def search_endpoint():
+def http_endpoint():
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
-            body = self.path.encode("utf-8")
+            body = self.headers.get("User-Agent", "") if self.path == "/user-agent" else self.path
+            body = body.encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "text/plain; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
@@ -166,8 +168,19 @@ def search_endpoint():
             worker.join()
 
 
+def verify_user_agent(browser):
+    version = browser.execute("return Services.appinfo.version", context="chrome")
+    ua_version = version.split(".")[0] + ".0"
+    expected = f"Mozilla/5.0 (X11; Linux x86_64; rv:{ua_version}) Gecko/20100101 Firefox/{ua_version}"
+    with http_endpoint() as url:
+        address(browser, url + "/user-agent")
+        agent, header = browser.execute("return [navigator.userAgent, document.body.textContent];")
+        assert agent == expected, (agent, expected)
+        assert header == expected, (header, expected)
+
+
 def verify_search(browser):
-    with search_endpoint() as url:
+    with http_endpoint() as url:
         result = browser.execute("""
             const [template, done] = arguments;
             const { SearchService } = ChromeUtils.importESModule(
@@ -190,6 +203,103 @@ def verify_search(browser):
         assert browser.execute("return document.body.textContent").strip() in (
             "/find?q=kanso+test", "/find?q=kanso%20test"
         )
+
+
+@contextmanager
+def onion_endpoint():
+    requests = []
+
+    class Handler(StreamRequestHandler):
+        def handle(self):
+            self.request.settimeout(3)
+            header = self.rfile.read(2)
+            if len(header) < 2:
+                return
+            assert header[0] == 5 and 0 in self.rfile.read(header[1])
+            self.wfile.write(b"\x05\x00")
+            assert self.rfile.read(4) == b"\x05\x01\x00\x03"
+            host = self.rfile.read(self.rfile.read(1)[0]).decode("ascii")
+            port = struct.unpack(">H", self.rfile.read(2))[0]
+            self.wfile.write(b"\x05\x00\x00\x01\x7f\x00\x00\x01\x00\x00")
+            method, path, _ = self.rfile.readline().decode("ascii").split()
+            while self.rfile.readline() not in (b"", b"\r\n"):
+                pass
+            requests.append((host, port, method, path))
+            body = b"Onion through SOCKS5"
+            self.wfile.write(b"HTTP/1.1 200 OK\r\nContent-Type: text/plain\r\n"
+                             b"Cache-Control: no-store\r\nConnection: close\r\n"
+                             + f"Content-Length: {len(body)}\r\n\r\n".encode() + body)
+
+    with ThreadingTCPServer(("127.0.0.1", 0), Handler) as server:
+        worker = Thread(target=server.serve_forever, daemon=True)
+        worker.start()
+        try:
+            yield server.server_address[1], requests
+        finally:
+            server.shutdown()
+            worker.join()
+
+
+def verify_onion_routing(browser):
+    host = "a" * 56 + ".onion"
+    onion = "http://" + host
+    with http_endpoint() as ordinary:
+        with onion_endpoint() as (port, requests):
+            fixed = browser.execute("""
+                const [host, port] = arguments;
+                Services.prefs.setIntPref("browser.kanso.onion.socks_port", port);
+                Services.prefs.setIntPref("network.proxy.type", 0);
+                return Services.uriFixup.getFixupURIInfo(host,
+                  Ci.nsIURIFixup.FIXUP_FLAG_ALLOW_KEYWORD_LOOKUP).preferredURI.spec;
+            """, host, port, context="chrome")
+            assert fixed == onion + "/", fixed
+            address(browser, onion + "/direct-mode")
+            assert browser.execute("return document.body.textContent") == "Onion through SOCKS5"
+            address(browser, ordinary + "/direct")
+            assert browser.execute("return document.body.textContent").strip() == "/direct"
+
+            proxy_port = int(ordinary.rsplit(":", 1)[1])
+            browser.execute("""
+                Services.prefs.setIntPref("network.proxy.type", 1);
+                Services.prefs.setCharPref("network.proxy.http", "127.0.0.1");
+                Services.prefs.setIntPref("network.proxy.http_port", arguments[0]);
+            """, proxy_port, context="chrome")
+            address(browser, onion + "/manual-proxy-mode")
+            assert browser.execute("return document.body.textContent") == "Onion through SOCKS5"
+            regular = "http://kanso-test.example/clearnet"
+            address(browser, regular)
+            assert browser.execute("return document.body.textContent").strip() == regular
+            assert all(hop[:3] == (host, 80, "GET") for hop in requests), requests
+            assert [hop for hop in requests if hop[3] != "/favicon.ico"] == [
+                (host, 80, "GET", "/direct-mode"),
+                (host, 80, "GET", "/manual-proxy-mode"),
+            ], requests
+
+        try:
+            address(browser, onion + "/tor-unavailable")
+        except RuntimeError as error:
+            assert "proxyConnectFailure" in str(error), error
+        else:
+            document = browser.execute("return document.documentURI")
+            assert document.startswith("about:neterror?e=proxyConnectFailure"), document
+
+    dns_blocked = browser.execute("""
+        try {
+          Services.dns.asyncResolve(arguments[0], Ci.nsIDNSService.RESOLVE_TYPE_DEFAULT, 0, null,
+            { onLookupComplete() {}, QueryInterface: ChromeUtils.generateQI(["nsIDNSListener"]) },
+            Services.tm.currentThread, {});
+        } catch (error) {
+          return error.result === Cr.NS_ERROR_UNKNOWN_HOST;
+        }
+        return false;
+    """, host.upper() + ".", context="chrome")
+    assert dns_blocked, "An onion hostname was not rejected before DNS lookup"
+    browser.execute("""
+        for (const name of ["browser.kanso.onion.socks_port", "network.proxy.type",
+                            "network.proxy.http", "network.proxy.http_port"]) {
+          Services.prefs.clearUserPref(name);
+        }
+    """, context="chrome")
 
 
 def select_font(path, family):
@@ -277,7 +387,53 @@ def verify_tab_chrome(browser, width):
     assert result["outline"] == [f"{width}px", f"{-width}px", "none"], result
 
 
+def internal_style(browser):
+    return browser.execute("""
+        const root = document.documentElement;
+        return [root.getAttribute("kanso-page"), getComputedStyle(root).backgroundColor,
+          performance.timeOrigin];
+    """)
+
+
+def verify_internal_appearance(browser, current):
+    for route, surface in (
+        ("addons", "addons"), ("protections", "protections"), ("downloads", "downloads"),
+        ("preferences#appearance", "preferences"),
+    ):
+        address(browser, "about:" + route)
+        wait_for(lambda: internal_style(browser)[:2] == [surface, "rgb(24, 36, 49)"],
+                 "Omarchy appearance in " + route)
+
+    navigation_start = internal_style(browser)[2]
+    staged = current / "live-style"
+    set_theme(staged, "light", "#eff1f5", "#4c4f69", "#1e66f5")
+    (staged / "colors.toml").replace(current / "theme" / "colors.toml")
+    staged.rmdir()
+    wait_for(lambda: internal_style(browser) == ["preferences", "rgb(239, 241, 245)", navigation_start],
+             "Settings updates without reloading")
+
+    original = browser.execute("""
+        const tab = gBrowser.addTrustedTab("about:blank", {inBackground: true});
+        gBrowser.pinTab(tab);
+        return gBrowser.tabs.length;
+    """, context="chrome")
+    browser.execute("SidebarController.toggleVerticalTabs();", context="chrome")
+    wait_for(lambda: browser.execute("""
+        return gBrowser.tabContainer.verticalMode &&
+          !!document.querySelector("#vertical-tabs .tabbrowser-tab[pinned]") &&
+          gBrowser.tabs.length === arguments[0];
+    """, original, context="chrome"), "vertical tabs with a pinned tab")
+    browser.execute("SidebarController.toggleVerticalTabs();", context="chrome")
+    wait_for(lambda: browser.execute("""
+        return !gBrowser.tabContainer.verticalMode &&
+          !!document.querySelector("#TabsToolbar .tabbrowser-tab[pinned]") &&
+          gBrowser.tabs.length === arguments[0];
+    """, original, context="chrome"), "restoring horizontal tabs")
+
+
 def verify(browser, current, first, second, video, font_config, fonts, compositor, args):
+    if not args.reference:
+        verify_user_agent(browser)
     address(browser, "about:newtab")
     assert browser.execute("""
         const form = document.getElementById("search");
@@ -444,8 +600,10 @@ def verify(browser, current, first, second, video, font_config, fonts, composito
         )
         browser.execute(find_checkbox + 'checkbox.shadowRoot.getElementById("input").click();')
         wait_for(lambda: chrome(browser)[0] == SYNCED_THEME, "restoring the selected theme in Settings")
+        wait_for(lambda: internal_style(browser)[0] is None, "restoring default Settings appearance")
         browser.execute(find_checkbox + 'checkbox.shadowRoot.getElementById("input").click();')
         wait_for(lambda: chrome(browser)[0] == target_id, "re-enabling theme sync in Settings")
+        verify_internal_appearance(browser, current)
 
     if args.signed_xpi:
         verify_signed_extension(browser, args.signed_xpi)
@@ -640,6 +798,8 @@ user_pref("datareporting.policy.dataSubmissionEnabled", false);
                 environment.update(compositor.environment)
             with running_browser(executable, profile, root / "browser.log", environment) as browser:
                 verify(browser, current, first, second, video, font_config, fonts, compositor, args)
+                if not args.reference:
+                    verify_onion_routing(browser)
                 save_profile_markers(browser)
                 browser.send("Marionette:Quit", flags=["eAttemptQuit"])
             with running_browser(executable, profile, root / "restart.log", environment, restart=True) as browser:

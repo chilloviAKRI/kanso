@@ -9,6 +9,7 @@
 #include "mozilla/CondVar.h"
 #include "mozilla/Logging.h"
 #include "mozilla/Mutex.h"
+#include "mozilla/Preferences.h"
 #include "mozilla/ScopeExit.h"
 #include "mozilla/StaticPrefs_network.h"
 #include "mozilla/Tokenizer.h"
@@ -269,7 +270,7 @@ class nsAsyncResolveRequest final : public nsIRunnable,
 
  public:
   nsresult ProcessLocally(nsProtocolInfo& info, nsIProxyInfo* pi,
-                          bool isSyncOK) {
+                          bool isSyncOK, bool aOnionProxy = false) {
     LOG(("nsAsyncResolveRequest::ProcessLocally"));
     SetResult(NS_OK, pi);
 
@@ -284,6 +285,11 @@ class nsAsyncResolveRequest final : public nsIRunnable,
 
       return ctx->DispatchCallback();
     };
+
+    if (aOnionProxy) {
+      mOnionProxy = true;
+      return consumeFiltersResult(this, pi, false);
+    }
 
     mAsyncFilterApplier = new AsyncApplyFilters(info, consumeFiltersResult);
     // may call consumeFiltersResult() directly
@@ -435,7 +441,9 @@ class nsAsyncResolveRequest final : public nsIRunnable,
     } else {
       LOG(("pac thread callback did not provide information %" PRIX32 "\n",
            static_cast<uint32_t>(mStatus)));
-      if (NS_SUCCEEDED(mStatus)) mPPS->MaybeDisableDNSPrefetch(mProxyInfo);
+      if (NS_SUCCEEDED(mStatus) && !mOnionProxy) {
+        mPPS->MaybeDisableDNSPrefetch(mProxyInfo);
+      }
       EnsureResolveFlagsMatch();
       nsProtocolProxyService::CallOnProxyAvailableCallback(
           mPPS, mCallback, this, mChannel, mProxyInfo, mStatus);
@@ -456,6 +464,7 @@ class nsAsyncResolveRequest final : public nsIRunnable,
   nsCString mPACString;
   nsCString mPACURL;
   bool mDispatched{false};
+  bool mOnionProxy{false};
   uint32_t mResolveFlags;
 
   nsProtocolProxyService* mPPS;
@@ -1555,6 +1564,15 @@ nsProtocolProxyService::ReloadPAC() {
   return NS_OK;
 }
 
+bool nsProtocolProxyService::IsOnionURI(nsIURI* aURI) {
+  nsAutoCString host;
+  if (NS_FAILED(aURI->GetAsciiHost(host))) {
+    return false;
+  }
+  host.Trim(".", false, true);
+  return StringEndsWith(host, ".onion"_ns, nsCaseInsensitiveCStringComparator);
+}
+
 nsresult nsProtocolProxyService::AsyncResolveInternal(
     nsIChannel* channel, uint32_t flags, nsIProtocolProxyCallback* callback,
     nsICancelable** result, bool isSyncOK,
@@ -1576,6 +1594,26 @@ nsresult nsProtocolProxyService::AsyncResolveInternal(
   if (NS_FAILED(rv)) return rv;
 
   nsCOMPtr<nsIProxyInfo> pi;
+  if ((info.flags & nsIProtocolHandler::ALLOWS_PROXY) && IsOnionURI(uri)) {
+    // Keep onion destinations away from PAC, system proxies, and extension
+    // proxy filters. Tor receives the hostname, with no DIRECT fallback.
+    constexpr int32_t kTorPort = 9050;
+    int32_t port = Preferences::GetInt("browser.kanso.onion.socks_port", kTorPort);
+    if (port < 1 || port > UINT16_MAX) {
+      port = kTorPort;
+    }
+    rv = NewProxyInfo_Internal(
+        kProxyType_SOCKS, "127.0.0.1"_ns, port, ""_ns, ""_ns, ""_ns, ""_ns,
+        ""_ns, nsIProxyInfo::TRANSPARENT_PROXY_RESOLVES_HOST, UINT32_MAX,
+        nullptr, flags, getter_AddRefs(pi));
+    NS_ENSURE_SUCCESS(rv, rv);
+    rv = ctx->ProcessLocally(info, pi, isSyncOK, /* aOnionProxy */ true);
+    if (NS_SUCCEEDED(rv) && !isSyncOK) {
+      ctx.forget(result);
+    }
+    return rv;
+  }
+
   bool usePACThread;
 
   // adapt to realtime changes in the system proxy service
