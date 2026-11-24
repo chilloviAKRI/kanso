@@ -1,0 +1,65 @@
+--- a/browser/components/about/AboutRedirector.cpp
++++ b/browser/components/about/AboutRedirector.cpp
+@@ -73,6 +73,12 @@
+      nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
+          nsIAboutModule::URI_CAN_LOAD_IN_CHILD |
+          nsIAboutModule::HIDE_FROM_ABOUTABOUT},
++    {"kanso-update", "resource://kanso/update.html",
++     nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
++         nsIAboutModule::URI_CAN_LOAD_IN_PRIVILEGEDABOUT_PROCESS |
++         nsIAboutModule::URI_MUST_LOAD_IN_CHILD |
++         nsIAboutModule::IS_SECURE_CHROME_UI |
++         nsIAboutModule::HIDE_FROM_ABOUTABOUT},
+     {"keyboard", "chrome://browser/content/customkeys/customkeys.html",
+      nsIAboutModule::URI_SAFE_FOR_UNTRUSTED_CONTENT |
+          nsIAboutModule::IS_SECURE_CHROME_UI | nsIAboutModule::ALLOW_SCRIPT |
+--- a/browser/components/about/components.conf
++++ b/browser/components/about/components.conf
+@@ -9,6 +9,7 @@
+     'certerror',
+     'downloads',
+     'framecrashed',
++    'kanso-update',
+     'keyboard',
+     'logins',
+     'loginsimportreport',
+--- a/browser/components/BrowserGlue.sys.mjs
++++ b/browser/components/BrowserGlue.sys.mjs
+@@ -808,6 +808,13 @@
+     }
+     this._windowsWereRestored = true;
+ 
++    if (Services.env.get("KANSO_UPDATE_OFFER")) {
++      const { KansoUpdate } = ChromeUtils.importESModule(
++        "resource:///modules/kanso/KansoUpdate.sys.mjs"
++      );
++      KansoUpdate.show(lazy.BrowserWindowTracker.getTopWindow({ private: false }));
++    }
++
+     lazy.PreonboardingSplash.maybeShowStartupSplash();
+     lazy.BrowserUsageTelemetry.init();
+     lazy.SearchSERPTelemetry.init();
+--- a/browser/components/DesktopActorRegistry.sys.mjs
++++ b/browser/components/DesktopActorRegistry.sys.mjs
+@@ -691,6 +691,21 @@
+     allFrames: true,
+     matches: SURFACE_MATCHES,
+     remoteTypes: ["parent", "privilegedabout", "privilegedmozilla"],
++  },
++
++  KansoUpdate: {
++    parent: {
++      esModuleURI: "resource:///modules/kanso/KansoUpdate.sys.mjs",
++    },
++    child: {
++      esModuleURI: "resource:///modules/kanso/KansoUpdateChild.sys.mjs",
++      events: {
++        DOMContentLoaded: { mozSystemGroup: true },
++        click: { mozSystemGroup: true },
++      },
++    },
++    matches: ["about:kanso-update"],
++    remoteTypes: ["privilegedabout"],
+   },
+ 
+   LightweightTheme: {

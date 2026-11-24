@@ -808,6 +808,13 @@ BrowserGlue.prototype = {
     }
     this._windowsWereRestored = true;
 
+    if (Services.env.get("KANSO_UPDATE_OFFER")) {
+      const { KansoUpdate } = ChromeUtils.importESModule(
+        "resource:///modules/kanso/KansoUpdate.sys.mjs"
+      );
+      KansoUpdate.show(lazy.BrowserWindowTracker.getTopWindow({ private: false }));
+    }
+
     lazy.PreonboardingSplash.maybeShowStartupSplash();
     lazy.BrowserUsageTelemetry.init();
     lazy.SearchSERPTelemetry.init();

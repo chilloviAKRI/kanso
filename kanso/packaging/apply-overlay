@@ -4,7 +4,7 @@ root=$1
 assets=$2
 
 install -d "$root/browser/components/kanso"
-for source in "$assets"/{moz.build,jar.mn,*.css,kanso.svg,newtab.html,newtab.js,*sys.mjs}; do
+for source in "$assets"/{moz.build,jar.mn,*.css,kanso.svg,*.html,newtab.js,*sys.mjs}; do
   install -m644 "$source" "$root/browser/components/kanso/"
 done
 

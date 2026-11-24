@@ -1,0 +1,124 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+
+:root {
+  color-scheme: light dark;
+  font: 15px/1.55 ui-monospace, monospace;
+  color: CanvasText;
+  background: Canvas;
+  --notice-background: Canvas;
+  --notice-border: GrayText;
+  --notice-accent: LinkText;
+  --notice-action: ButtonFace;
+  --notice-action-text: ButtonText;
+  --notice-radius: 4px;
+  --notice-stroke: 1px;
+}
+
+@media (forced-colors: none) {
+  :root[omarchy] {
+    --notice-background: var(--omarchy-surface);
+    --notice-border: var(--kanso-line);
+    --notice-accent: var(--omarchy-accent);
+    --notice-action: var(--omarchy-action);
+    --notice-action-text: var(--omarchy-action-text);
+    --notice-radius: var(--kanso-radius);
+    --notice-stroke: var(--kanso-stroke);
+    background: color-mix(in srgb, var(--omarchy-background) 96%, var(--omarchy-accent));
+  }
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+  padding: 20px;
+  box-sizing: border-box;
+  display: grid;
+  place-items: center;
+}
+
+main {
+  box-sizing: border-box;
+  inline-size: min(100%, 546px);
+  padding: clamp(20px, 6vw, 38px);
+  border: var(--notice-stroke) solid var(--notice-border);
+  border-block-start-color: var(--notice-accent);
+  border-radius: var(--notice-radius);
+  background: var(--notice-background);
+}
+
+.icon {
+  display: block;
+  inline-size: 36px;
+  block-size: 36px;
+  margin-block-end: 18px;
+}
+
+h1 {
+  margin: 0 0 8px;
+  font-size: clamp(21px, 4.5vw, 29px);
+  line-height: 1.23;
+  font-weight: 650;
+}
+
+p, dl, dd {
+  margin: 0;
+}
+
+#description, dt {
+  color: color-mix(in srgb, currentColor 78%, var(--notice-background));
+}
+
+.versions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 140px), 1fr));
+  gap: 8px;
+  margin-block: 24px;
+}
+
+.versions > div {
+  padding: 9px 12px;
+  border: var(--notice-stroke) solid var(--notice-border);
+  border-radius: var(--notice-radius);
+}
+
+.versions > .available {
+  border-color: var(--notice-accent);
+}
+
+dt {
+  font-size: 0.8rem;
+}
+
+dd {
+  margin-block-start: 3px;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+button {
+  min-block-size: 43px;
+  padding: 9px 14px;
+  font: inherit;
+  font-weight: 650;
+  color: var(--notice-action-text);
+  background: var(--notice-action);
+  border: var(--notice-stroke) solid var(--notice-accent);
+  border-radius: var(--notice-radius);
+  cursor: pointer;
+}
+
+button:focus-visible {
+  outline: 2px solid var(--notice-accent);
+  outline-offset: 3px;
+}
+
+button:disabled {
+  opacity: 0.66;
+  cursor: wait;
+}
+
+#status:not(:empty) {
+  margin-block-start: 14px;
+}

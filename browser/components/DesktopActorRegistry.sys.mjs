@@ -693,6 +693,21 @@ let JSWINDOWACTORS = {
     remoteTypes: ["parent", "privilegedabout", "privilegedmozilla"],
   },
 
+  KansoUpdate: {
+    parent: {
+      esModuleURI: "resource:///modules/kanso/KansoUpdate.sys.mjs",
+    },
+    child: {
+      esModuleURI: "resource:///modules/kanso/KansoUpdateChild.sys.mjs",
+      events: {
+        DOMContentLoaded: { mozSystemGroup: true },
+        click: { mozSystemGroup: true },
+      },
+    },
+    matches: ["about:kanso-update"],
+    remoteTypes: ["privilegedabout"],
+  },
+
   LightweightTheme: {
     child: {
       esModuleURI: "resource:///actors/LightweightThemeChild.sys.mjs",

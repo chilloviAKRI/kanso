@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src resource:; img-src resource:" />
+    <title>Kanso</title>
+    <link rel="icon" href="resource://kanso/kanso.svg" />
+    <link rel="stylesheet" href="resource://kanso/update.css" />
+  </head>
+  <body>
+    <main>
+      <img class="icon" src="resource://kanso/kanso.svg" alt="" />
+      <h1 id="title">Kanso</h1>
+      <div id="offer" hidden>
+        <p id="description"></p>
+        <dl class="versions">
+          <div><dt id="installed"></dt><dd id="installed-version"></dd></div>
+          <div class="available"><dt id="available"></dt><dd id="available-version"></dd></div>
+        </dl>
+        <button type="button" id="apply"></button>
+        <p id="status" role="status"></p>
+      </div>
+    </main>
+  </body>
+</html>

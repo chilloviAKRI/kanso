@@ -6,3 +6,5 @@ browser.jar:
   content/kanso/newtab.css                 (newtab.css)
   content/kanso/newtab.html                (newtab.html)
   content/kanso/newtab.js                  (newtab.js)
+  content/kanso/update.css                 (update.css)
+  content/kanso/update.html                (update.html)

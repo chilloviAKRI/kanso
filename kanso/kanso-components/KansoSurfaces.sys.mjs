@@ -4,6 +4,7 @@
 
 const surfaces = new Map([
   ["about:newtab", "newtab"],
+  ["about:kanso-update", "update"],
   ["about:preferences", "preferences"],
   ["about:settings", "preferences"],
   ["about:addons", "addons"],
