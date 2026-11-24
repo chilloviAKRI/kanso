@@ -98,7 +98,10 @@ dd {
 }
 
 button {
+  display: block;
+  max-inline-size: 100%;
   min-block-size: 43px;
+  margin-inline: auto;
   padding: 9px 14px;
   font: inherit;
   font-weight: 650;
@@ -121,4 +124,5 @@ button:disabled {
 
 #status:not(:empty) {
   margin-block-start: 14px;
+  text-align: center;
 }
