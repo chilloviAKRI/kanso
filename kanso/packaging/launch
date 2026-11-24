@@ -14,7 +14,7 @@ import tempfile
 
 
 REPO = "chilloviAKRI/kanso"
-LATEST_RELEASE = f"https://api.github.com/repos/{REPO}/releases/latest"
+LATEST_RELEASE = f"https://github.com/{REPO}/releases/latest/download/kanso-update.json"
 SYSTEM_APP = Path("/usr/lib/kanso-browser")
 SYSTEM_COMMAND = Path("/usr/bin/kanso-browser")
 SYSTEM_LOCK = Path("/run/lock/kanso-browser.lock")
@@ -44,25 +44,19 @@ def version_in(app):
 
 
 def latest_package(installed):
-    data = json.loads(curl(LATEST_RELEASE, "--max-time", "4", "--max-filesize", "1048576",
-                           "--header", "Accept: application/vnd.github+json"))
-    tag = data["tag_name"]
-    if data["draft"] or data["prerelease"] or not tag.startswith("v"):
-        return None
-    version = tag[1:]
-    if not VERSION.fullmatch(version):
-        return None
+    data = json.loads(curl(LATEST_RELEASE, "--max-time", "4", "--max-filesize", "4096"))
+    version = data["version"]
+    if not isinstance(version, str) or not VERSION.fullmatch(version):
+        raise ValueError("Invalid Kanso release version")
     if run("vercmp", version, installed, capture_output=True, text=True).stdout.strip() != "1":
         return None
     name = f"kanso-browser-{version}-x86_64.pkg.tar.zst"
-    url = f"https://github.com/{REPO}/releases/download/{tag}/{name}"
-    for asset in data["assets"]:
-        if asset["name"] == name and asset["state"] == "uploaded" and asset["browser_download_url"] == url:
-            digest, size = asset.get("digest"), asset.get("size")
-            if (isinstance(digest, str) and re.fullmatch(r"sha256:[0-9a-f]{64}", digest)
-                    and type(size) is int and 0 < size <= MAX_PACKAGE_SIZE):
-                return version, name, url, digest[7:], size
-    raise ValueError(f"Release {tag} lacks a verifiable Arch package")
+    url = f"https://github.com/{REPO}/releases/download/v{version}/{name}"
+    digest, size = data["sha256"], data["size"]
+    if (isinstance(digest, str) and re.fullmatch(r"[0-9a-f]{64}", digest)
+            and type(size) is int and 0 < size <= MAX_PACKAGE_SIZE):
+        return version, name, url, digest, size
+    raise ValueError(f"Release {version} lacks a verifiable Arch package")
 
 
 def download_package(release, directory):

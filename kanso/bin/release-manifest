@@ -1,0 +1,27 @@
+#!/usr/bin/python -I
+"""Write the startup update manifest for a built x86-64 Arch package."""
+
+import hashlib
+import json
+from pathlib import Path
+import re
+import subprocess
+import sys
+
+
+if len(sys.argv) != 2:
+    sys.exit("Usage: bin/release-manifest path/to/kanso-browser-<version>-x86_64.pkg.tar.zst")
+
+archive = Path(sys.argv[1])
+match = re.fullmatch(r"kanso-browser-([0-9]+(?:\.[0-9]+){1,2}-[0-9]+(?:\.[0-9]+)?)-x86_64\.pkg\.tar\.zst", archive.name)
+if not match:
+    sys.exit("Expected the x86-64 Kanso package")
+
+version = match[1]
+info = subprocess.check_output(["/usr/bin/pacman", "-Qp", "--", archive], text=True).strip()
+if info != f"kanso-browser {version}":
+    sys.exit("The package name or version does not match its filename")
+
+with archive.open("rb") as stream:
+    digest = hashlib.file_digest(stream, "sha256").hexdigest()
+print(json.dumps({"version": version, "sha256": digest, "size": archive.stat().st_size}, indent=2))

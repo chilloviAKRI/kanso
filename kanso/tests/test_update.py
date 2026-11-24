@@ -19,18 +19,10 @@ loader.exec_module(launcher)
 
 
 def metadata(version, contents):
-    name = f"kanso-browser-{version}-x86_64.pkg.tar.zst"
     return {
-        "tag_name": f"v{version}",
-        "draft": False,
-        "prerelease": False,
-        "assets": [{
-            "name": name,
-            "state": "uploaded",
-            "browser_download_url": f"https://github.com/{launcher.REPO}/releases/download/v{version}/{name}",
-            "digest": f"sha256:{hashlib.sha256(contents).hexdigest()}",
-            "size": len(contents),
-        }],
+        "version": version,
+        "sha256": hashlib.sha256(contents).hexdigest(),
+        "size": len(contents),
     }
 
 
@@ -44,17 +36,15 @@ class ReleaseSelection(unittest.TestCase):
         self.assertIsNone(self.select(metadata("160.0.1-9", b"package")))
         self.assertIsNone(self.select(metadata("160.0.1-8", b"package")))
 
-    def test_prereleases_are_ignored(self):
-        data = metadata("160.0.1-10", b"package")
-        data["prerelease"] = True
-        self.assertIsNone(self.select(data))
+    def test_non_release_versions_are_rejected(self):
+        with self.assertRaises(ValueError):
+            self.select(metadata("160.0.1-10-beta", b"package"))
 
     def test_unverified_assets_are_rejected(self):
-        for field, value in (("digest", "bad"), ("size", 0), ("state", "new"),
-                             ("browser_download_url", "https://example.com/kanso.pkg.tar.zst")):
+        for field, value in (("sha256", "bad"), ("size", 0), ("size", True)):
             with self.subTest(field=field):
                 data = metadata("160.0.1-10", b"package")
-                data["assets"][0][field] = value
+                data[field] = value
                 with self.assertRaises(ValueError):
                     self.select(data)
 
